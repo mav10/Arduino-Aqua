@@ -8,6 +8,12 @@
  */
 #include <ESP8266WiFi.h>
 
+#define bufferMax 128
+int bufferSize;
+char buffer[bufferMax];
+String readString = String(128);
+char post;
+
 const int LOG_NORMAL = 0;
 const int LOG_SUCCESS = 1;
 const int LOG_WARNING = 2;
@@ -17,8 +23,10 @@ const char* ssid = "WiFi-DOM.ru-2463";
 const char* password = "89502657277";
 
 String logString = "";
-int gPioD5 = 5;
-int gPioD6 = 6;
+int gPioD5 = 14;
+int gPioD6 = 12;
+int gPioD7 = 13;
+int gPioD8 = 15;
 
 // Create an instance of the server
 // specify the port to listen on as an argument
@@ -81,7 +89,7 @@ String GetPage(){
   page += "                <h3 class='card-title'>Connection: ON</h3>";
   page += "                <div class='row'>";
   page += "                  <div class='col-md-3'>";
-  page += "                    <h6 class='card-title'>RAM:" + String(freeRam()) + "</h6>";
+  page += "                    <h6 class='card-title'>RAM: </h6>";
   page += "                  </div>";
   page += "                  <div class='col-md-9'>";
   page += "                    <div class='progress'>";
@@ -160,12 +168,12 @@ String GetPage(){
   page += "                </h5>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/gpio/D5/0' method='POST'>";
+  page += "                <form action='/' method='POST'>";
   page += "                  <button type='button submit' name='D5' value='1' class='btn btn-success'>ON</button>";
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/gpio/D5/1' method='POST'>";
+  page += "                <form action='/' method='POST'>";
   page += "                  <button type='button submit' name='D5' value='0' class='btn btn-danger'>OFF</button>";
   page += "                </form>";
   page += "              </div>";
@@ -175,10 +183,10 @@ String GetPage(){
   page += "                </h5>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/gpio/D6/0' method='POST'><button type='button submit' name='D6' value='1' class='btn btn-success'>ON</button></form>";
+  page += "                <form action='/' method='POST'><button type='button submit' name='D6' value='1' class='btn btn-success'>ON</button></form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/gpio/D6/1' method='POST'><button type='button submit' name='D6' value='0' class='btn btn-danger'>OFF</button></form>";
+  page += "                <form action='/' method='POST'><button type='button submit' name='D6' value='0' class='btn btn-danger'>OFF</button></form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <h5 class='text-left'>";
@@ -191,7 +199,7 @@ String GetPage(){
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/gpio/D7' method='POST'>";
+  page += "                <form action='/' method='POST'>";
   page += "                  <button type='button submit' name='D7' value='1' class='btn btn-info btn-sm'>SEND</button>";
   page += "                </form>";
   page += "              </div>";
@@ -207,7 +215,7 @@ String GetPage(){
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/gpio/D8' method='POST'>";
+  page += "                <form action='/' method='POST'>";
   page += "                  <button id='D8Button' type='button submit' name='D8' value='0' class='btn btn-info btn-sm'>SEND</button>";
   page += "                </form>";
   page += "              </div>";
@@ -330,6 +338,7 @@ String GetPage(){
 
 void Log(String text, int status){
    String color[4] = {"black", "green", "yellow", "red"};
+  logString += "<p style='color:" + color[status] +"' >" + text + "</p>";
 }
 
 bool UpdatePins(String request){
@@ -339,6 +348,10 @@ bool UpdatePins(String request){
      digitalWrite(gPioD5, 0);
   else if (request.indexOf("/gpio/D5/1") != -1)
     digitalWrite(gPioD5, 1);
+ else if (request.indexOf("/gpio/D6/0") != -1)
+  digitalWrite(gPioD6, 0);
+else if (request.indexOf("/gpio/D6/1") != -1)
+  digitalWrite(gPioD6, 1);
   else {
     Serial.println("invalid API request");
     return false;
@@ -351,10 +364,19 @@ void setup() {
   Serial.begin(115200);
   delay(10);
 
-  // prepare GPIO2
-  pinMode(gPioD5, OUTPUT);
-  digitalWrite(gPioD5, 0);
+  ConfigureGpio();
+  ConfigureWiFi();
+ 
+}
+
+void loop() {
   
+  // Send the response to the client
+  getPostRequest();
+  delay(1);
+}
+
+void ConfigureWiFi(){
   // Connect to WiFi network
   Serial.println();
   Serial.println();
@@ -381,48 +403,80 @@ void setup() {
   Log(WiFi.localIP().toString(), LOG_NORMAL);
   
   // Print the IP address
-  Serial.println(WiFi.localIP());
+  Serial.println(WiFi.localIP()); 
 }
 
-void loop() {
-  // Check if a client has connected
+void ConfigureGpio(){
+  
+  pinMode(gPioD5, OUTPUT);
+  digitalWrite(gPioD5, 0);
+
+  pinMode(gPioD6, OUTPUT);
+  digitalWrite(gPioD6, 0);
+
+   pinMode(gPioD7, OUTPUT);
+  digitalWrite(gPioD7, 0);
+
+   pinMode(gPioD8, OUTPUT);
+  digitalWrite(gPioD8, 0);
+}
+
+void getPostRequest() {
   WiFiClient client = server.available();
-  if (!client) {
-    return;
+  
+  if (client) {
+    Serial.println("Client connected");
+    boolean currentLineIsBlank = true;
+    bufferSize = 0;
+    while (client.connected()) {
+      if(client.available()){
+        char c = client.read();
+        // если вы получили символ новой строки
+        // и символ пустой строки, то POST запрос закончился
+        // и вы можете отправить ответ
+        if (c == '\n' && currentLineIsBlank) {
+          // Здесь содержатся данные POST запроса 
+          while(client.available()) {  
+            post = client.read();   
+            if(bufferSize < bufferMax)
+              buffer[bufferSize++] = post;  // сохраняем новый символ в буфере и создаем приращение bufferSize 
+          }
+          Serial.println("Received POST request:");
+          // Разбор HTTP POST запроса                  
+          Serial.println(buffer);
+          // Выполнение команд
+          PerformRequestedCommands();
+          // Отправка ответа
+          client.print(GetPage());
+          client.stop();
+        } 
+        else if (c == '\n') {
+          currentLineIsBlank = true;
+        } 
+        else if (c != '\r') {
+          currentLineIsBlank = false;
+        }
+      }
+    }
+    Serial.println("Port closed");
   }
-  
-  // Wait until the client sends some data
-  Serial.println("new client");
-  Log("New Client", LOG_NORMAL);
-  
-  while(!client.available()){
-    delay(1);
-  }
-  
-  //Read the first line of the request
-  String req = client.readStringUntil('\r');
-  Serial.println(req);
-  client.flush();
-  
-  bool isCorrect = UpdatePins(req);
-  if(!isCorrect){
-    client.stop();
-    return;
-  }
-  
-  // Send the response to the client
-  String responseBody = GetPage();
-  client.print(responseBody);
-  delay(1);
-  Serial.println("Client disonnected");
-
-  // The client will actually be disconnected 
-  // when the function returns and 'client' object is detroyed
 }
 
-int freeRam () {
-  Serial.println();
-  int freeBytes = 1234;
-  Serial.println('RAM: ' + freeBytes);
-  return freeBytes;
+
+void PerformRequestedCommands() {
+  readString = buffer;
+  Serial.println(readString);
+  if(readString.indexOf('D5=1') > 0) { 
+    Serial.println('do it d5=1');
+    digitalWrite(gPioD5, 1);        
+  } else if (readString.indexOf('D5=0') > 0) {
+    Serial.println('do it d5=0');
+    digitalWrite(gPioD5, 0);         
+  } else if(readString.indexOf('D6=1') > 0) { 
+    Serial.println('do it d6=1');
+    digitalWrite(gPioD6, 1);        
+  } else if (readString.indexOf('D6=0') > 0) { 
+    Serial.println('do it d5=0');
+    digitalWrite(gPioD6, 0);         
+  }  
 }
