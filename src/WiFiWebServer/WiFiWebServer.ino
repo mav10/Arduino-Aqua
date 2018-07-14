@@ -193,16 +193,22 @@ String GetPage(){
   page += "                  D7  <span class='badge badge-pill  badge-warning'><i>title</i></span>";
   page += "                </h5>";
   page += "              </div>";
-  page += "              <div class='col-md-4'>";
-  page += "                <form method='POST'>";
-  page += "                    <input type='time' class='form-control' id='time' placeholder='20:30'>";
-  page += "                </form>";
-  page += "              </div>";
-  page += "              <div class='col-md-4'>";
-  page += "                <form action='/' method='POST'>";
-  page += "                  <button type='button submit' name='D7' value='1' class='btn btn-info btn-sm'>SEND</button>";
-  page += "                </form>";
-  page += "              </div>";
+  page += "              <div class='col-md-8'>";
+  page += "              <form action='/' method='POST'>";
+  page += "               <div class='row'>";
+  page += "                  <div class='col-md-5'>";
+  page += "                    <input type='time' class='form-control' name='D7timeStart' placeholder='20:30'>";
+  page += "                  </div>";
+  page += "                  <div class='col-md-2'>";
+  page += "                    <p> -> </p>";
+  page += "                  </div>";
+  page += "                  <div class='col-md-5'>";
+  page += "                     <input type='time' class='form-control' name='D7timeEnd' placeholder='20:30'>";
+  page += "                   </div>";
+  page += "               </div>";
+  page += "               <button type='submit' class='btn btn-info btn-sm btn-block'>SEND</button>";
+  page += "             </form>";
+  page += "            </div>";
   page += "              <div class='col-md-4'>";
   page += "                <h5 class='text-left'>";
   page += "                  D8  <span class='badge badge-pill  badge-warning'><i>title</i></span>";
@@ -251,40 +257,40 @@ String GetPage(){
   page += "        </button>";
   page += "      </div>";
   page += "      <div class='modal-body'>";
-  page += "        <form action='/led' method='POST'>";
+  page += "        <form action='/' method='POST'>";
   page += "          <div class='form-group row'>";
   page += "            <label for='colFormLabel' class='col-sm-2 col-form-label'>Time</label>";
   page += "            <div class='col-sm-10'>";
-  page += "              <input type='time' class='form-control' id='time' placeholder='20:30'>";
+  page += "              <input type='time' class='form-control' name='LEDtime' placeholder='20:30'>";
   page += "            </div>";
   page += "          </div>";
   page += "          <div class='form-group row'>";
   page += "            <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 1</label>";
   page += "            <div class='col-sm-10'>";
-  page += "              <input type='number' class='form-control' id='chanel1' placeholder='0'>";
+  page += "              <input type='number' class='form-control' name='LEDchanel1' placeholder='0'>";
   page += "            </div>";
   page += "          </div>";
   page += "          <div class='form-group row'>";
   page += "            <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 2</label>";
   page += "            <div class='col-sm-10'>";
-  page += "              <input type='number' class='form-control' id='chanel2' placeholder='255'>";
+  page += "              <input type='number' class='form-control' name='LEDchanel2' placeholder='255'>";
   page += "            </div>";
   page += "          </div>";
   page += "          <div class='form-group row'>";
   page += "            <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 3</label>";
   page += "            <div class='col-sm-10'>";
-  page += "              <input type='number' class='form-control' id='chanel13' placeholder='0'>";
+  page += "              <input type='number' class='form-control' name='LEDchanel13' placeholder='0'>";
   page += "            </div>";
   page += "          </div>";
   page += "          <div class='form-group row'>";
   page += "            <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 4</label>";
   page += "            <div class='col-sm-10'>";
-  page += "              <input type='number' class='form-control' id='chanel4' placeholder='255'>";
+  page += "              <input type='number' class='form-control' name='LEDchanel4' placeholder='255'>";
   page += "            </div>";
   page += "          </div>";
   page += "          <div class='modal-footer'>";
   page += "            <button type='reset' class='btn btn-secondary'>Reset</button>";
-  page += "           <button type='submit' class='btn btn-primary'>Save</button>";
+  page += "            <button type='submit' class='btn btn-primary'>Save</button>";
   page += "         </div>";
   page += "        </form>";
   page += "      </div>";
@@ -340,25 +346,6 @@ void Log(String text, int status){
    String color[4] = {"black", "green", "yellow", "red"};
   logString += "<p style='color:" + color[status] +"' >" + text + "</p>";
 }
-
-bool UpdatePins(String request){
-   //Match the request
-  int val;
-  if (request.indexOf("/gpio/D5/0") != -1)
-     digitalWrite(gPioD5, 0);
-  else if (request.indexOf("/gpio/D5/1") != -1)
-    digitalWrite(gPioD5, 1);
- else if (request.indexOf("/gpio/D6/0") != -1)
-  digitalWrite(gPioD6, 0);
-else if (request.indexOf("/gpio/D6/1") != -1)
-  digitalWrite(gPioD6, 1);
-  else {
-    Serial.println("invalid API request");
-    return false;
-  }
-  return true;
-}
-
 
 void setup() {
   Serial.begin(115200);
@@ -441,6 +428,8 @@ void getPostRequest() {
             if(bufferSize < bufferMax)
               buffer[bufferSize++] = post;  // сохраняем новый символ в буфере и создаем приращение bufferSize 
           }
+
+          client.flush();
           Serial.println("Received POST request:");
           // Разбор HTTP POST запроса                  
           Serial.println(buffer);
@@ -465,18 +454,52 @@ void getPostRequest() {
 
 void PerformRequestedCommands() {
   readString = buffer;
-  Serial.println(readString);
-  if(readString.indexOf('D5=1') > 0) { 
-    Serial.println('do it d5=1');
-    digitalWrite(gPioD5, 1);        
-  } else if (readString.indexOf('D5=0') > 0) {
-    Serial.println('do it d5=0');
-    digitalWrite(gPioD5, 0);         
-  } else if(readString.indexOf('D6=1') > 0) { 
-    Serial.println('do it d6=1');
-    digitalWrite(gPioD6, 1);        
-  } else if (readString.indexOf('D6=0') > 0) { 
-    Serial.println('do it d5=0');
-    digitalWrite(gPioD6, 0);         
-  }  
+  if(readString.indexOf("D5") != -1) { 
+    int value = getValueFromHtmlForm("D5", readString).toInt();
+    digitalWrite(gPioD5, value);              
+  } else if(readString.indexOf("D6") != -1) {
+    int value = getValueFromHtmlForm("D6", readString).toInt();
+    digitalWrite(gPioD6, value);
+  } else if(readString.indexOf("D8") != -1) {
+    int value = getValueFromHtmlForm("D8", readString).toInt();
+    digitalWrite(gPioD8, value);
+  }else {
+    Serial.println("do it nothing");
+  }
+
+  if(readString.indexOf("D7") != -1) {
+    saveD7TimeShcedule(readString);
+  }
+
+  if(readString.indexOf("LED") != -1) {
+    PerformNewLedEvent(readString);
+  }
 }
+
+void PerformNewLedEvent(String requestBody) {
+  
+  int chanel1 = getValueFromHtmlForm("LEDchanel1", requestBody).toInt();
+  int chanel2 = getValueFromHtmlForm("LEDchanel2", requestBody).toInt();
+  int chanel3 = getValueFromHtmlForm("LEDchanel3", requestBody).toInt();
+  int chanel4 = getValueFromHtmlForm("LEDchanel4", requestBody).toInt();
+
+  Serial.println(chanel1);
+  Serial.println(chanel2);
+  Serial.println(chanel3);
+  Serial.println(chanel4);
+}
+
+void saveD7TimeShcedule(String requestBody){
+  String startTime = getValueFromHtmlForm("timeStart", requestBody);
+  startTime = startTime.substring(0, startTime.indexOf("&D7timeEnd"));
+  String endTime = getValueFromHtmlForm("timeEnd", requestBody);
+
+  startTime.replace("%3A", ":");
+  endTime.replace("%3A", ":");
+}
+
+String getValueFromHtmlForm(String gpioName, String requestBody){
+  int startIndex = requestBody.indexOf(gpioName + "=");
+    return requestBody.substring(startIndex + gpioName.length() + 1);
+}
+

@@ -157,14 +157,20 @@
                   D7  <span class='badge badge-pill  badge-warning'><i>title</i></span>
                 </h5>
               </div>
-              <div class='col-md-4'>
-                <form method='POST'>
-                    <input type='time' class='form-control' id='time' placeholder='20:30'>
-                </form>
-              </div>
-              <div class='col-md-4'>
-                <form action='/gpio/D7' method='POST'>
-                  <button type='button submit' name='D7' value='1' class='btn btn-info btn-sm'>SEND</button>
+              <div class='col-md-8'>
+                <form action='http://192.168.101.135/' method='POST'>
+					<div class='row'>
+						<div class='col-md-5'>
+							<input type='time' class='form-control' id='timeStart' placeholder='20:30'>
+						</div>
+						<div class='col-md-2'>
+							<p> -> </p>
+						</div>
+						<div class='col-md-5'>
+							<input type='time' class='form-control' id='timeEnd' placeholder='20:30'>
+						</div>
+					</div>
+					<button type='submit' class='btn btn-info btn-sm btn-block'>SEND</button>
                 </form>
               </div>
               <div class='col-md-4'>
