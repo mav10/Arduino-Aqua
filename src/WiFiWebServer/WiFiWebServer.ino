@@ -28,24 +28,24 @@ WiFiServer server(80);
 
 typedef struct {
   sensor_name sensorName;
-  unsigned int value;
-  unsigned int pin;
+  int value;
+  int pin;
   bool isPwm;
 } State;
 
 typedef struct {
   String timeExecute;
-  unsigned int cahnel1;
-  unsigned int cahnel2;
-  unsigned int cahnel3;
-  unsigned int cahnel4;
+  int cahnel1;
+  int cahnel2;
+  int cahnel3;
+  int cahnel4;
 } LedSchedule;
 
-State sensors[] = {
+State sensors[8] = {
    {LED_1, 0, 16, true},
    {LED_2, 0, 5, true},
    {LED_3, 0, 4, true},
-   {LED_4, 0, 2, true},
+   {LED_4, 0, 2, false},
    {D5, 0, 14, false},
    {D6, 0, 12, false},
    {D7, 0, 13, false},
@@ -181,7 +181,7 @@ String GetPage(){
   page += "              </tr>";
   page += "            </thead>";
   page += "            <tbody>";
-  page +=                WriteLedTable();
+  page +=                "WriteLedTable()";
   page += "            </tbody>";
   page += "          </table>";
   page += "        </div>";
@@ -379,14 +379,17 @@ void Log(String text, logs_state status){
 void setup() {
   Serial.begin(115200);
   delay(10);
-  Serial.println("configuring");
+  Serial.println();
+  Serial.println("start configuring");
+  delay(10);
   ConfigureGpio();
   ConfigureWiFi();
  
 }
 
 void loop() {
-  
+  ApplyCurrentState();
+  delay(1);
   // Send the response to the client
   getPostRequest();
   delay(1);
@@ -422,12 +425,15 @@ void ConfigureWiFi(){
 }
 
 void ConfigureGpio(){
-  for(int i = 0; i < sizeof(sensors); i++){
+  Serial.println("GPIO...");
+  Serial.println(String(sizeof(sensor_name)));
+  Serial.println(String(sizeof(timetable)));
+  for(int i = 0; i < 8; i++){
     if(sensors[i].isPwm) {
-      Serial.println("skip configure");
+      Serial.println("skip");
       //analogWrite(sensors[i].pin, sensors[i].value);
     } else {
-      Serial.println("do configure");
+      Serial.println("do");
       pinMode(sensors[i].pin, OUTPUT);
       digitalWrite(sensors[i].pin, sensors[i].value);
     }
@@ -486,6 +492,12 @@ void UpdatePinValue(sensor_name sensorName, int value) {
   }
 }
 
+void ApplyCurrentState(){
+  for(int i=4; i < 8; i++) {
+    digitalWrite(sensors[i].pin, sensors[i].value);
+  }
+}
+
 void PerformRequestedCommands() {
   readString = buffer;
   if(readString.indexOf("D5") != -1) { 
@@ -503,10 +515,6 @@ void PerformRequestedCommands() {
 
   if(readString.indexOf("D7") != -1) {
     saveD7TimeShcedule(readString);
-  }
-
-  if(readString.indexOf("LED") != -1) {
-    PerformNewLedEvent(readString);
   }
 }
 
