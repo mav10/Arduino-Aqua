@@ -14,24 +14,73 @@ char buffer[bufferMax];
 String readString = String(128);
 char post;
 
-const int LOG_NORMAL = 0;
-const int LOG_SUCCESS = 1;
-const int LOG_WARNING = 2;
-const int LOG_ERROR = 3;
+enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
+enum sensor_name {LED_1, LED_2, LED_3, LED_4, D5, D6, D7, D8};
 
 const char* ssid = "WiFi-DOM.ru-2463";
 const char* password = "89502657277";
 
 String logString = "";
-int gPioD5 = 14;
-int gPioD6 = 12;
-int gPioD7 = 13;
-int gPioD8 = 15;
 
 // Create an instance of the server
 // specify the port to listen on as an argument
 WiFiServer server(80);
 
+typedef struct {
+  sensor_name sensorName;
+  unsigned int value;
+  unsigned int pin;
+  bool isPwm;
+} State;
+
+typedef struct {
+  String timeExecute;
+  unsigned int cahnel1;
+  unsigned int cahnel2;
+  unsigned int cahnel3;
+  unsigned int cahnel4;
+} LedSchedule;
+
+State sensors[] = {
+   {LED_1, 0, 16, true},
+   {LED_2, 0, 5, true},
+   {LED_3, 0, 4, true},
+   {LED_4, 0, 2, true},
+   {D5, 0, 14, false},
+   {D6, 0, 12, false},
+   {D7, 0, 13, false},
+   {D8, 0, 15, false}
+};
+
+LedSchedule timetable[24] = {
+  {"08:00", 132, 10, 200, 233},
+  {"09:30", 12, 120, 18, 180},
+  {"10:23", 100, 100, 200, 255}
+};
+
+String WriteLedTable(){
+  String row = "";
+  for(int i = 0; i < sizeof(timetable); i++) {
+    row += "              <tr>";
+    row += "                <td>";
+    row +=                    timetable[i].timeExecute;
+    row +=                  "</td>";
+    row += "                <td>";
+    row +=                    timetable[i].cahnel1;
+    row +=                  "</td>";
+    row += "                <td>";
+    row +=                    timetable[i].cahnel2;
+    row +=                  "</td>";
+    row += "                <td>";
+    row +=                    timetable[i].cahnel3;
+    row +=                  "</td>";
+    row += "                <td>";
+    row +=                    timetable[i].cahnel4;
+    row +=                  "</td>";
+    row += "              </tr>";
+  }
+  return row;
+}
 
 String GetPage(){
   String page = "";
@@ -132,27 +181,7 @@ String GetPage(){
   page += "              </tr>";
   page += "            </thead>";
   page += "            <tbody>";
-  page += "              <tr>";
-  page += "                <td>8:00</td>";
-  page += "                <td>123</td>";
-  page += "                <td>220</td>";
-  page += "                <td>255</td>";
-  page += "                <td>123</td>";
-  page += "              </tr>";
-  page += "              <tr>";
-  page += "                <td>10:20</td>";
-  page += "                <td>230</td>";
-  page += "                <td>108</td>";
-  page += "                <td>43</td>";
-  page += "                <td>108</td>";
-  page += "              </tr>";
-  page += "              <tr>";
-  page += "                <td>12:27</td>";
-  page += "                <td>100</td>";
-  page += "                <td>87</td>";
-  page += "                <td>25</td>";
-  page += "                <td>25</td>";
-  page += "              </tr>";
+  page +=                WriteLedTable();
   page += "            </tbody>";
   page += "          </table>";
   page += "        </div>";
@@ -342,7 +371,7 @@ String GetPage(){
   return page;
 }
 
-void Log(String text, int status){
+void Log(String text, logs_state status){
    String color[4] = {"black", "green", "yellow", "red"};
   logString += "<p style='color:" + color[status] +"' >" + text + "</p>";
 }
@@ -350,7 +379,7 @@ void Log(String text, int status){
 void setup() {
   Serial.begin(115200);
   delay(10);
-
+  Serial.println("configuring");
   ConfigureGpio();
   ConfigureWiFi();
  
@@ -364,14 +393,13 @@ void loop() {
 }
 
 void ConfigureWiFi(){
-  // Connect to WiFi network
-  Serial.println();
+    // Connect to WiFi network
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
   
-  Log("Connecting to ", LOG_NORMAL);
-  Log(ssid, LOG_NORMAL);
+  Log("Connecting to ", NORMAL);
+  Log(ssid, NORMAL);
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -383,29 +411,27 @@ void ConfigureWiFi(){
   Serial.println("");
   Serial.println("WiFi connected");
 
-  Log("WiFi connected", LOG_SUCCESS);
+  Log("WiFi connected", SUCCESS);
   // Start the server
   server.begin();
-  Log("Server started", LOG_SUCCESS);
-  Log(WiFi.localIP().toString(), LOG_NORMAL);
+  Log("Server started", SUCCESS);
+  Log(WiFi.localIP().toString(), NORMAL);
   
   // Print the IP address
   Serial.println(WiFi.localIP()); 
 }
 
 void ConfigureGpio(){
-  
-  pinMode(gPioD5, OUTPUT);
-  digitalWrite(gPioD5, 0);
-
-  pinMode(gPioD6, OUTPUT);
-  digitalWrite(gPioD6, 0);
-
-   pinMode(gPioD7, OUTPUT);
-  digitalWrite(gPioD7, 0);
-
-   pinMode(gPioD8, OUTPUT);
-  digitalWrite(gPioD8, 0);
+  for(int i = 0; i < sizeof(sensors); i++){
+    if(sensors[i].isPwm) {
+      Serial.println("skip configure");
+      //analogWrite(sensors[i].pin, sensors[i].value);
+    } else {
+      Serial.println("do configure");
+      pinMode(sensors[i].pin, OUTPUT);
+      digitalWrite(sensors[i].pin, sensors[i].value);
+    }
+  }
 }
 
 void getPostRequest() {
@@ -451,18 +477,26 @@ void getPostRequest() {
   }
 }
 
+void UpdatePinValue(sensor_name sensorName, int value) {
+  if(sensors[sensorName].sensorName == sensorName){
+    sensors[sensorName].value = value;
+    Log(String(sensorName) + " sensor was updated to " + String(value), SUCCESS);
+  }else{
+    Log(String(sensorName) + " sensor was not updated", DANGER);
+  }
+}
 
 void PerformRequestedCommands() {
   readString = buffer;
   if(readString.indexOf("D5") != -1) { 
     int value = getValueFromHtmlForm("D5", readString).toInt();
-    digitalWrite(gPioD5, value);              
+    UpdatePinValue(D5, value);              
   } else if(readString.indexOf("D6") != -1) {
     int value = getValueFromHtmlForm("D6", readString).toInt();
-    digitalWrite(gPioD6, value);
+    UpdatePinValue(D6, value);
   } else if(readString.indexOf("D8") != -1) {
     int value = getValueFromHtmlForm("D8", readString).toInt();
-    digitalWrite(gPioD8, value);
+    UpdatePinValue(D8, value);
   }else {
     Serial.println("do it nothing");
   }
@@ -476,17 +510,25 @@ void PerformRequestedCommands() {
   }
 }
 
+int GetFreeCellInTimeTable() {
+  for(int i =0; i < sizeof(timetable); i++){
+    if (sizeof(timetable[i].timeExecute) == 0)
+      return i;
+  }
+  for(int i = 1; i < sizeof(timetable); i++) {
+    timetable[i-1] = timetable[i];
+  }
+  return sizeof(timetable) - 1;
+}
+
 void PerformNewLedEvent(String requestBody) {
-  
   int chanel1 = getValueFromHtmlForm("LEDchanel1", requestBody).toInt();
   int chanel2 = getValueFromHtmlForm("LEDchanel2", requestBody).toInt();
   int chanel3 = getValueFromHtmlForm("LEDchanel3", requestBody).toInt();
   int chanel4 = getValueFromHtmlForm("LEDchanel4", requestBody).toInt();
 
-  Serial.println(chanel1);
-  Serial.println(chanel2);
-  Serial.println(chanel3);
-  Serial.println(chanel4);
+  int index = GetFreeCellInTimeTable();
+  timetable[index] = {"time", chanel1, chanel2, chanel3, chanel4};
 }
 
 void saveD7TimeShcedule(String requestBody){
