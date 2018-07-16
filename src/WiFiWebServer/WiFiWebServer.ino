@@ -45,11 +45,11 @@ State sensors[8] = {
    {LED_1, 0, 16, true},
    {LED_2, 0, 5, true},
    {LED_3, 0, 4, true},
-   {LED_4, 0, 2, false},
+   {LED_4, 0, 2, true},
    {D5, 0, 14, false},
    {D6, 0, 12, false},
    {D7, 0, 13, false},
-   {D8, 0, 15, false}
+   {D8, 0, 15, true}
 };
 
 LedSchedule timetable[24] = {
@@ -59,8 +59,9 @@ LedSchedule timetable[24] = {
 };
 
 String WriteLedTable(){
+  int sizeArray = sizeof(timetable)/sizeof(LedSchedule);
   String row = "";
-  for(int i = 0; i < sizeof(timetable); i++) {
+  for(int i = 0; i < sizeArray; i++) {
     row += "              <tr>";
     row += "                <td>";
     row +=                    timetable[i].timeExecute;
@@ -181,7 +182,7 @@ String GetPage(){
   page += "              </tr>";
   page += "            </thead>";
   page += "            <tbody>";
-  page +=                "WriteLedTable()";
+  page +=                WriteLedTable();
   page += "            </tbody>";
   page += "          </table>";
   page += "        </div>";
@@ -308,7 +309,7 @@ String GetPage(){
   page += "          <div class='form-group row'>";
   page += "            <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 3</label>";
   page += "            <div class='col-sm-10'>";
-  page += "              <input type='number' class='form-control' name='LEDchanel13' placeholder='0'>";
+  page += "              <input type='number' class='form-control' name='LEDchanel3' placeholder='0'>";
   page += "            </div>";
   page += "          </div>";
   page += "          <div class='form-group row'>";
@@ -425,19 +426,8 @@ void ConfigureWiFi(){
 }
 
 void ConfigureGpio(){
-  Serial.println("GPIO...");
-  Serial.println(String(sizeof(sensor_name)));
-  Serial.println(String(sizeof(timetable)));
-  for(int i = 0; i < 8; i++){
-    if(sensors[i].isPwm) {
-      Serial.println("skip");
-      //analogWrite(sensors[i].pin, sensors[i].value);
-    } else {
-      Serial.println("do");
-      pinMode(sensors[i].pin, OUTPUT);
-      digitalWrite(sensors[i].pin, sensors[i].value);
-    }
-  }
+  Serial.println("configure GPIO...");
+  ApplyCurrentState();
 }
 
 void getPostRequest() {
@@ -493,9 +483,24 @@ void UpdatePinValue(sensor_name sensorName, int value) {
 }
 
 void ApplyCurrentState(){
-  for(int i=4; i < 8; i++) {
-    digitalWrite(sensors[i].pin, sensors[i].value);
+  int sizeArray = sizeof(sensors)/sizeof(State);
+  AssignCurrentLedValueFromTimeTable();
+  for(int i = 0; i < sizeArray; i++){
+    if(sensors[i].isPwm) {
+      analogWrite(sensors[i].pin, sensors[i].value);
+    } else {
+      pinMode(sensors[i].pin, OUTPUT);
+      digitalWrite(sensors[i].pin, sensors[i].value);
+    }
   }
+}
+
+void AssignCurrentLedValueFromTimeTable(){
+  int last = sizeof(timetable)/sizeof(LedSchedule) - 1;
+  sensors[LED_1].value = timetable[last].cahnel1;
+  sensors[LED_2].value = timetable[last].cahnel2;
+  sensors[LED_3].value = timetable[last].cahnel3;
+  sensors[LED_4].value = timetable[last].cahnel4;
 }
 
 void PerformRequestedCommands() {
@@ -516,17 +521,22 @@ void PerformRequestedCommands() {
   if(readString.indexOf("D7") != -1) {
     saveD7TimeShcedule(readString);
   }
+
+  if(readString.indexOf("LED") != -1) {
+    PerformNewLedEvent(readString);
+  }
 }
 
 int GetFreeCellInTimeTable() {
-  for(int i =0; i < sizeof(timetable); i++){
+  int sizeArray = sizeof(timetable)/sizeof(LedSchedule);
+  for(int i =0; i < sizeArray; i++){
     if (sizeof(timetable[i].timeExecute) == 0)
       return i;
   }
-  for(int i = 1; i < sizeof(timetable); i++) {
+  for(int i = 1; i < sizeArray; i++) {
     timetable[i-1] = timetable[i];
   }
-  return sizeof(timetable) - 1;
+  return sizeArray - 1;
 }
 
 void PerformNewLedEvent(String requestBody) {
