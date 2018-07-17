@@ -1,3 +1,7 @@
+#include <LinkedList.h>
+
+#include <Wire.h>
+#include <RtcDS3231.h> //RTC library
 /*
  *  This sketch demonstrates how to set up a simple HTTP-like server.
  *  The server will set a GPIO pin depending on the request
@@ -9,16 +13,17 @@
  *  Sorting was downloaded here https://github.com/emilv/ArduinoSort
  */
 #include <ESP8266WiFi.h>
-#include <ArduinoSort.h>
-
+#include <String.h> // Для strcmp
 #define bufferMax 128
 int bufferSize;
 char buffer[bufferMax];
 String readString = String(128);
 char post;
 
+RtcDS3231<TwoWire> rtcObject(Wire);
+
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
-enum sensor_name {LED_1, LED_2, LED_3, LED_4, D5, D6, D7, D8};
+enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD6, GD7, GD8};
 
 const char* ssid = "WiFi-DOM.ru-2463";
 const char* password = "89502657277";
@@ -50,36 +55,34 @@ typedef struct {
 } LedSchedule;
 
 State sensors[8] = {
-   {LED_1, 0, 16, true},
-   {LED_2, 0, 5, true},
-   {LED_3, 0, 4, true},
-   {LED_4, 0, 2, true},
-   {D5, 0, 14, false},
-   {D6, 0, 12, false},
-   {D7, 0, 13, false},
-   {D8, 0, 15, true}
+   {LED_1, 0, D0, true},
+   {LED_2, 0, D1, true},
+   {LED_3, 0, D2, true},
+   {LED_4, 0, D4, true},
+   {GD5, 0, D5, false},
+   {GD6, 0, D6, false},
+   {GD7, 0, D7, false},
+   {GD8, 0, D8, true}
 };
 
-TimeExecution D7TimeTable;
+TimeExecution GD7TimeTable;
 
-LedSchedule timetable[24] = {
-  {"08:00", 132, 10, 200, 233},
-  {"09:30", 12, 120, 18, 180},
-  {"10:23", 100, 100, 200, 255}
-};
-
+LinkedList<LedSchedule> *timetable = new LinkedList<LedSchedule>();
 
 void Log(String text, logs_state status){
    String color[4] = {"black", "green", "yellow", "red"};
   logString += "<p style='color:" + color[status] +"' >" + text + "</p>";
 }
 
-bool comparisonSchedule(LedSchedule first, LedSchedule second) {
-  if (first.timeExecute > second.timeExecute) {
-    return true;
-  } else {
-    return false;
+/*int comparisonSchedule(LedSchedule *&a, LedSchedule *&b) {
+  return strcmp(a->timeExecute, b->timeExecute)
+}*/
+
+int compare(LedSchedule& a, LedSchedule& b) {
+  if(a.timeExecute > b.timeExecute){
+    return 1;
   }
+  return -1;
 }
 
 void setup() {
@@ -87,6 +90,13 @@ void setup() {
   delay(10);
   Serial.println();
   Serial.println("start configuring");
+
+  rtcObject.Begin();     //Starts I2C
+ 
+  RtcDateTime currentTime = RtcDateTime(16, 05, 18, 21, 20, 0); //define date and time object
+  rtcObject.SetDateTime(currentTime); //configure the RTC with object
+ 
+  
   delay(10);
   ConfigureGpio();
   ConfigureWiFi();
@@ -94,11 +104,18 @@ void setup() {
 }
 
 void loop() {
+  
   ApplyCurrentState();
   delay(1);
   // Send the response to the client
   getPostRequest();
   delay(1);
+  DoSchedule();
+}
+
+String getCurrentTime(){
+  RtcDateTime currentTime = rtcObject.GetDateTime();
+  return currentTime.Day() + ":" + currentTime.Hour();
 }
 
 void ConfigureWiFi(){
@@ -192,7 +209,6 @@ void UpdatePinValue(sensor_name sensorName, int value) {
 
 void ApplyCurrentState(){
   int sizeArray = sizeof(sensors)/sizeof(State);
-  AssignCurrentLedValueFromTimeTable();
   for(int i = 0; i < sizeArray; i++){
     if(sensors[i].isPwm) {
       analogWrite(sensors[i].pin, sensors[i].value);
@@ -203,53 +219,33 @@ void ApplyCurrentState(){
   }
 }
 
-void AssignCurrentLedValueFromTimeTable(){
-  int last = sizeof(timetable)/sizeof(LedSchedule) - 1;
-  sensors[LED_1].value = timetable[last].cahnel1;
-  sensors[LED_2].value = timetable[last].cahnel2;
-  sensors[LED_3].value = timetable[last].cahnel3;
-  sensors[LED_4].value = timetable[last].cahnel4;
+void AssignCurrentLedValueFromTimeTable(int timeTableEventIndex){
+  sensors[LED_1].value = timetable->get(timeTableEventIndex).cahnel1;
+  sensors[LED_2].value = timetable->get(timeTableEventIndex).cahnel2;
+  sensors[LED_3].value = timetable->get(timeTableEventIndex).cahnel3;
+  sensors[LED_4].value = timetable->get(timeTableEventIndex).cahnel4;
 }
 
 void PerformRequestedCommands() {
   readString = buffer;
-  if(readString.indexOf("D5") != -1) { 
-    int value = getValueFromHtmlForm("D5", readString).toInt();
-    UpdatePinValue(D5, value);              
-  } else if(readString.indexOf("D6") != -1) {
-    int value = getValueFromHtmlForm("D6", readString).toInt();
-    UpdatePinValue(D6, value);
-  } else if(readString.indexOf("D8") != -1) {
-    int value = getValueFromHtmlForm("D8", readString).toInt();
-    UpdatePinValue(D8, value);
-  }else if(readString.indexOf("D7") != -1) {
-    saveD7TimeShcedule(readString);
+  if(readString.indexOf("GD5") != -1) { 
+    int value = getValueFromHtmlForm("GD5", readString).toInt();
+    UpdatePinValue(GD5, value);              
+  } else if(readString.indexOf("GD6") != -1) {
+    int value = getValueFromHtmlForm("GD6", readString).toInt();
+    UpdatePinValue(GD6, value);
+  } else if(readString.indexOf("GD8") != -1) {
+    int value = getValueFromHtmlForm("GD8", readString).toInt();
+    UpdatePinValue(GD8, value);
+  }else if(readString.indexOf("GD7") != -1) {
+    saveGD7TimeShcedule(readString);
   }else if(readString.indexOf("LED") != -1) {
     PerformNewLedEvent(readString);
   }else if (readString.indexOf("clearTimeTable") != -1){
-    MakeZeroArrayTimeTable();
+    timetable->clear();
   }else {
     Serial.println("empty request");
   }
-}
-
-void MakeZeroArrayTimeTable(){
-  int sizeArray = sizeof(timetable)/sizeof(LedSchedule);
-  for(int i =0; i < sizeArray; i++){
-    timetable[i] = {};
-  }
-}
-
-int GetFreeCellInTimeTable() {
-  int sizeArray = sizeof(timetable)/sizeof(LedSchedule);
-  for(int i =0; i < sizeArray; i++){
-    if (timetable[i].timeExecute.length() <= 0)
-      return i;
-  }
-  for(int i = 1; i < sizeArray; i++) {
-    timetable[i-1] = timetable[i];
-  }
-  return sizeArray - 1;
 }
 
 void PerformNewLedEvent(String requestBody) {
@@ -260,8 +256,7 @@ void PerformNewLedEvent(String requestBody) {
 
   String timeSetup = parseLedTime(requestBody, "LEDtime", "&LEDchanel1"); 
 
-  int index = GetFreeCellInTimeTable();
-  timetable[index] = {timeSetup, chanel1, chanel2, chanel3, chanel4};  
+  timetable->add({timeSetup, chanel1, chanel2, chanel3, chanel4});  
 }
 
 String parseLedTime(String requestBody, String patternStart, String patternEnd){
@@ -271,20 +266,20 @@ String parseLedTime(String requestBody, String patternStart, String patternEnd){
   return Time;
 }
 
-void saveD7TimeShcedule(String requestBody){
+void saveGD7TimeShcedule(String requestBody){
   Serial.print("incoming ");
   Serial.println(requestBody);
   String startTime = getValueFromHtmlForm("timeStart", requestBody);
   Serial.print("parsed ");
   Serial.println(startTime);
-  startTime = startTime.substring(0, startTime.indexOf("&D7timeEnd"));
+  startTime = startTime.substring(0, startTime.indexOf("&GD7timeEnd"));
   Serial.print("parsed substr");
   Serial.println(startTime);
   String endTime = getValueFromHtmlForm("timeEnd", requestBody);
 
   startTime.replace("%3A", ":");
   endTime.replace("%3A", ":");
-  D7TimeTable = {startTime, endTime}; 
+  GD7TimeTable = {startTime, endTime}; 
 }
 
 String getValueFromHtmlForm(String gpioName, String requestBody){
@@ -293,31 +288,39 @@ String getValueFromHtmlForm(String gpioName, String requestBody){
 }
 
 String WriteLedTable(){
-  int sizeArray = sizeof(timetable)/sizeof(LedSchedule);
-  sortArray(timetable, sizeArray, comparisonSchedule);
+  timetable->sort(compare);
   String row = "";
-  for(int i = 0; i < sizeArray; i++) {
-    if(timetable[i].timeExecute.length() > 0){
+  for(int i = 0; i < timetable->size(); i++) {
       row += "              <tr>";
       row += "                <td>";
-      row +=                    timetable[i].timeExecute;
+      row +=                    timetable->get(i).timeExecute;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable[i].cahnel1;
+      row +=                    timetable->get(i).cahnel1;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable[i].cahnel2;
+      row +=                    timetable->get(i).cahnel2;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable[i].cahnel3;
+      row +=                    timetable->get(i).cahnel3;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable[i].cahnel4;
+      row +=                    timetable->get(i).cahnel4;
       row +=                  "</td>";
       row += "              </tr>";
-    }
   }
   return row;
+}
+
+void DoSchedule(){
+  String currentTime = getCurrentTime();
+//  timetable->sort(compare);
+  for(int i = 0; i < timetable->size() - 1; i++){
+    if ((timetable->get(i).timeExecute <= currentTime) && (currentTime < timetable->get(i+1).timeExecute)) {
+      //todo: add smoozhy value increase
+      AssignCurrentLedValueFromTimeTable(i);
+    }
+  }
 }
 
 String GetPage(){
@@ -389,7 +392,9 @@ String GetPage(){
   page += "                </div>";
   page += "              </div>";
   page += "        <div class='card-footer'>";
-  page += "       <small>Work duration:</small>";
+  page += "         <small>Work duration:";
+  page +=             getCurrentTime();
+  page += "         </small>";
   page += "         </div>";
   page += "            </div>";
   page += "          </div>";
@@ -437,32 +442,32 @@ String GetPage(){
   page += "              <div class='col-md-4'>";
   page += "                <h5 class='text-left'>";
   page += "                  D5  <span class='badge badge-pill badge-";
-  page +=                   (sensors[D5].value == 1) ? "primary" : "dark";
+  page +=                   (sensors[GD5].value == 1) ? "primary" : "dark";
   page += "                 '>Light</span>";
   page += "                </h5>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <form action='/' method='POST'>";
-  page += "                  <button type='button submit' name='D5' value='1' class='btn btn-success'>ON</button>";
+  page += "                  <button type='button submit' name='GD5' value='1' class='btn btn-success'>ON</button>";
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <form action='/' method='POST'>";
-  page += "                  <button type='button submit' name='D5' value='0' class='btn btn-danger'>OFF</button>";
+  page += "                  <button type='button submit' name='GD5' value='0' class='btn btn-danger'>OFF</button>";
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <h5 class='text-left'>";
   page += "                  D6  <span class='badge badge-pill badge-";
-  page +=                   (sensors[D6].value == 1) ? "primary" : "dark";
+  page +=                   (sensors[GD6].value == 1) ? "primary" : "dark";
   page += "                 '>Coller</span>";
   page += "                </h5>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/' method='POST'><button type='button submit' name='D6' value='1' class='btn btn-success'>ON</button></form>";
+  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='1' class='btn btn-success'>ON</button></form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <form action='/' method='POST'><button type='button submit' name='D6' value='0' class='btn btn-danger'>OFF</button></form>";
+  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='0' class='btn btn-danger'>OFF</button></form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <h5 class='text-left'>";
@@ -473,13 +478,13 @@ String GetPage(){
   page += "              <form action='/' method='POST'>";
   page += "               <div class='row'>";
   page += "                  <div class='col-md-5'>";
-  page += "                    <input type='time' class='form-control' name='D7timeStart' value='" + D7TimeTable.startTime + "' placeholder='20:30'>";
+  page += "                    <input type='time' class='form-control' name='GD7timeStart' value='" + GD7TimeTable.startTime + "' placeholder='20:30'>";
   page += "                  </div>";
   page += "                  <div class='col-md-2'>";
   page += "                    <p> -> </p>";
   page += "                  </div>";
   page += "                  <div class='col-md-5'>";
-  page += "                     <input type='time' class='form-control' name='D7timeEnd' value='" + D7TimeTable.finishTime + "' placeholder='20:30'>";
+  page += "                     <input type='time' class='form-control' name='GD7timeEnd' value='" + GD7TimeTable.finishTime + "' placeholder='20:30'>";
   page += "                   </div>";
   page += "               </div>";
   page += "               <button type='submit' class='btn btn-info btn-sm btn-block'>SEND</button>";
@@ -491,16 +496,16 @@ String GetPage(){
   page += "                </h5>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                  <input id='D8ex' data-slider-id='ex1Slider' type='button submit' data-slider-min='0' data-slider-max='1023' data-slider-step='1' style='width:100px' data-slider-value='";
-  page +=                     sensors[D8].value;
+  page += "                  <input id='GD8ex' data-slider-id='ex1Slider' type='button submit' data-slider-min='0' data-slider-max='1023' data-slider-step='1' style='width:100px' data-slider-value='";
+  page +=                     sensors[GD8].value;
   page += "                   ' />";
-  page += "                  <span id='ex6CurrentSliderValLabel'>Value: <span id='D8exVal'>";
-  page +=                       sensors[D8].value;
+  page += "                  <span id='ex6CurrentSliderValLabel'>Value: <span id='GD8exVal'>";
+  page +=                       sensors[GD8].value;
   page += "                   </span></span>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <form action='/' method='POST'>";
-  page += "                  <button id='D8Button' type='button submit' name='D8' value='0' class='btn btn-info btn-sm'>SEND</button>";
+  page += "                  <button id='GD8Button' type='button submit' name='GD8' value='0' class='btn btn-info btn-sm'>SEND</button>";
   page += "                </form>";
   page += "              </div>";
   page += "            </div>";
@@ -603,15 +608,15 @@ String GetPage(){
   page += "  </script>";
   page += "  <script type='text/javascript'>";
   page += "      $(document).ready(function () {";
-  page += "          $('#D8ex').slider({";
+  page += "          $('#GD8ex').slider({";
   page += "              formatter: function (value) {";
   page += "                  return 'Current value: ' + value;";
   page += "              },";
   page += "              tooltip: 'always'";
   page += "          });";
-  page += "          $('#D8ex').on('slide', function(slideEvt) {";
-  page += "           $('#D8exVal').text(slideEvt.value);";
-  page += "            $('#D8Button').attr('value', slideEvt.value);";
+  page += "          $('#GD8ex').on('slide', function(slideEvt) {";
+  page += "           $('#GD8exVal').text(slideEvt.value);";
+  page += "            $('#GD8Button').attr('value', slideEvt.value);";
   page += "          });";
   page += "      });";
   page += "  </script>";
