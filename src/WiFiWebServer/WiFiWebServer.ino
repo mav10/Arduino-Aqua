@@ -1,7 +1,7 @@
 #include <LinkedList.h>
 
 #include <Wire.h>
-#include <RtcDS3231.h> //RTC library
+#include "RTClib.h"
 /*
  *  This sketch demonstrates how to set up a simple HTTP-like server.
  *  The server will set a GPIO pin depending on the request
@@ -10,7 +10,8 @@
  *  server_ip is the IP address of the ESP8266 module, will be 
  *  printed to Serial when the module is connected.
  *  
- *  Sorting was downloaded here https://github.com/emilv/ArduinoSort
+ *  Sorting was downloaded here https://github.com/ivanseidel/LinkedList
+ *  Rtc lib cpulld be downloaded via Arduino Market place "RTClib by Adafruit"
  */
 #include <ESP8266WiFi.h>
 #include <String.h> // Для strcmp
@@ -20,7 +21,7 @@ char buffer[bufferMax];
 String readString = String(128);
 char post;
 
-RtcDS3231<TwoWire> rtcObject(Wire);
+RTC_DS3231 rtc;
 
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
 enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD6, GD7, GD8};
@@ -74,10 +75,6 @@ void Log(String text, logs_state status){
   logString += "<p style='color:" + color[status] +"' >" + text + "</p>";
 }
 
-/*int comparisonSchedule(LedSchedule *&a, LedSchedule *&b) {
-  return strcmp(a->timeExecute, b->timeExecute)
-}*/
-
 int compare(LedSchedule& a, LedSchedule& b) {
   if(a.timeExecute > b.timeExecute){
     return 1;
@@ -91,13 +88,8 @@ void setup() {
   Serial.println();
   Serial.println("start configuring");
 
-  rtcObject.Begin();     //Starts I2C
- 
-  RtcDateTime currentTime = RtcDateTime(16, 05, 18, 21, 20, 0); //define date and time object
-  rtcObject.SetDateTime(currentTime); //configure the RTC with object
- 
-  
   delay(10);
+  ConfigureClock();
   ConfigureGpio();
   ConfigureWiFi();
  
@@ -114,8 +106,42 @@ void loop() {
 }
 
 String getCurrentTime(){
-  RtcDateTime currentTime = rtcObject.GetDateTime();
-  return currentTime.Day() + ":" + currentTime.Hour();
+  DateTime now = rtc.now();  
+  return String(now.hour(), DEC) + ":" + String(now.minute(), DEC);
+}
+
+void ConfigureClock(){
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+  }
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, lets set the time!");
+    // following line sets the RTC to the date & time this sketch was compiled
+    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+     rtc.adjust(DateTime(2018, 7, 20, 22, 20, 0));
+    DateTime now = rtc.now();
+    
+    Serial.println("Chech time writing after configuring");  
+    Serial.print(now.year(), DEC);
+    Serial.print('/');
+    Serial.print(now.month(), DEC);
+    Serial.print('/');
+    Serial.print(now.day(), DEC);
+    Serial.print(' ');
+    Serial.print(now.hour(), DEC);
+    Serial.print(':');
+    Serial.print(now.minute(), DEC);
+    Serial.print(':');
+    Serial.print(now.second(), DEC);
+    Serial.println();
+  }
+
+
+  
+  Log("time: " + getCurrentTime(), NORMAL);
 }
 
 void ConfigureWiFi(){
@@ -314,12 +340,18 @@ String WriteLedTable(){
 
 void DoSchedule(){
   String currentTime = getCurrentTime();
-//  timetable->sort(compare);
+  timetable->sort(compare);
   for(int i = 0; i < timetable->size() - 1; i++){
     if ((timetable->get(i).timeExecute <= currentTime) && (currentTime < timetable->get(i+1).timeExecute)) {
       //todo: add smoozhy value increase
       AssignCurrentLedValueFromTimeTable(i);
     }
+  }
+  if ((GD7TimeTable.startTime >= currentTime) && (GD7TimeTable.finishTime <= currentTime))
+  {
+    sensors[GD7].value = 1;
+  }else{
+    sensors[GD7].value = 0;
   }
 }
 
