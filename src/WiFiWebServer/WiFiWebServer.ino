@@ -1,7 +1,7 @@
 #include <LinkedList.h>
 
 #include <Wire.h>
-#include "RTClib.h"
+#include <RTClib.h>
 /*
  *  This sketch demonstrates how to set up a simple HTTP-like server.
  *  The server will set a GPIO pin depending on the request
@@ -106,8 +106,15 @@ void loop() {
 }
 
 String getCurrentTime(){
-  DateTime now = rtc.now();  
-  return String(now.hour(), DEC) + ":" + String(now.minute(), DEC);
+  DateTime now = rtc.now();
+  String parsedMin = "";
+  if(now.minute() < 10 && String(now.minute(), DEC).length < 2){
+    parsedMin = String(0) + String(now.minute(), DEC);
+  }
+  else{
+    parsedMin = String(now.minute(), DEC);
+  }
+  return String(now.hour(), DEC) + ":" + parsedMin;
 }
 
 void ConfigureClock(){
@@ -118,11 +125,12 @@ void ConfigureClock(){
   if (rtc.lostPower()) {
     Serial.println("RTC lost power, lets set the time!");
     // following line sets the RTC to the date & time this sketch was compiled
-    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     // This line sets the RTC with an explicit date & time, for example to set
     // January 21, 2014 at 3am you would call:
-     rtc.adjust(DateTime(2018, 7, 20, 22, 20, 0));
-    DateTime now = rtc.now();
+     //rtc.adjust(DateTime(2018, 7, 20, 22, 20, 0));
+     }
+ DateTime now = rtc.now();
     
     Serial.println("Chech time writing after configuring");  
     Serial.print(now.year(), DEC);
@@ -137,9 +145,6 @@ void ConfigureClock(){
     Serial.print(':');
     Serial.print(now.second(), DEC);
     Serial.println();
-  }
-
-
   
   Log("time: " + getCurrentTime(), NORMAL);
 }
@@ -265,6 +270,8 @@ void PerformRequestedCommands() {
     UpdatePinValue(GD8, value);
   }else if(readString.indexOf("GD7") != -1) {
     saveGD7TimeShcedule(readString);
+  }else if(readString.indexOf("SystemTime7") != -1) {
+    setupTime(readString);
   }else if(readString.indexOf("LED") != -1) {
     PerformNewLedEvent(readString);
   }else if (readString.indexOf("clearTimeTable") != -1){
@@ -293,19 +300,22 @@ String parseLedTime(String requestBody, String patternStart, String patternEnd){
 }
 
 void saveGD7TimeShcedule(String requestBody){
-  Serial.print("incoming ");
-  Serial.println(requestBody);
   String startTime = getValueFromHtmlForm("timeStart", requestBody);
-  Serial.print("parsed ");
-  Serial.println(startTime);
   startTime = startTime.substring(0, startTime.indexOf("&GD7timeEnd"));
-  Serial.print("parsed substr");
-  Serial.println(startTime);
   String endTime = getValueFromHtmlForm("timeEnd", requestBody);
 
   startTime.replace("%3A", ":");
   endTime.replace("%3A", ":");
   GD7TimeTable = {startTime, endTime}; 
+}
+
+void setupTime(String requestBody){
+  String startTime = getValueFromHtmlForm("SystemTime", requestBody);
+  startTime.replace("%3A", ":");
+  int index = startTime.indexOf(":");
+  int hoursNumber =  startTime.substring(0, index).toInt();
+  int minNumber = startTime.substring(index + 1).toInt();
+  rtc.adjust(DateTime(2018, 7, 21, hoursNumber, minNumber, 0));
 }
 
 String getValueFromHtmlForm(String gpioName, String requestBody){
@@ -410,19 +420,17 @@ String GetPage(){
   page += "          <div class='col-md-4'>";
   page += "            <div class='card text-white bg-info mb-3'>";
   page += "              <div class='card-header'>Arduino info</div>";
-  page += "              <div class='card-body'>";
-  page += "                <h3 class='card-title'>Connection: ON</h3>";
-  page += "                <div class='row'>";
-  page += "                  <div class='col-md-3'>";
-  page += "                    <h6 class='card-title'>RAM: </h6>";
-  page += "                  </div>";
-  page += "                  <div class='col-md-9'>";
-  page += "                    <div class='progress'>";
-  page += "                      <div class='progress-bar bg-warning' role='progressbar' style='width: 75%' aria-valuenow='75' aria-valuemin='0' aria-valuemax='100'></div>";
-  page += "                    </div>";
-  page += "                  </div>";
+  page += "<div class='card-body'>";
+  page += "                  <h3 class='card-title'>Connection: ON</h3>";
+  page += "                    <form action='/' method='POST' style='margin:0px'>";
+  page += "             <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>";
+  page += "               Setup time";
+  page += "             </button>";
+  page += "             <button type='submit' name='clearAll' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>";
+  page += "               Clear cash and logs";
+  page += "             </button>";
+  page += "             </form>";
   page += "                </div>";
-  page += "              </div>";
   page += "        <div class='card-footer'>";
   page += "         <small>Work duration:";
   page +=             getCurrentTime();
@@ -613,6 +621,33 @@ String GetPage(){
   page += "  </div>";
   page += "</div>";
   page += "";
+  page += "<div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>";
+page += "    <div class='modal-dialog' role='document'>";
+page += "      <div class='modal-content'>";
+page += "        <div class='modal-header'>";
+page += "          <h4 class='modal-title'>Time's settings</h4>";
+page += "          <button type='button' class='close' data-dismiss='modal' aria-label='Close'>";
+page += "            <span aria-hidden='true'>&times;</span>";
+page += "          </button>";
+page += "        </div>";
+page += "        <div class='modal-body'>";
+page += "          <form action='/' method='POST'>";
+page += "            <div class='form-group row'>";
+page += "              <label for='colFormLabel' class='col-sm-2 col-form-label'>Time</label>";
+page += "              <div class='col-sm-10'>";
+page += "                <input type='time' class='form-control' name='SystemTime' placeholder='20:30'>";
+page += "              </div>";
+page += "            </div>";
+page += "            ";
+page += "            <div class='modal-footer'>";
+page += "              <button type='reset' class='btn btn-secondary'>Reset</button>";
+page += "              <button type='submit' class='btn btn-primary'>Save</button>";
+page += "           </div>";
+page += "          </form>";
+page += "        </div>";
+page += "      </div>";
+page += "    </div>";
+page += "  </div>";
   page += "  <script type='text/javascript'>";
   page += "    Highcharts.chart('LedContainer', {";
   page += "      data: {";
