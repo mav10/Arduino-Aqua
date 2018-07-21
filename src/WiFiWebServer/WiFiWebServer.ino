@@ -39,10 +39,10 @@ String readString = String(128);
 String logString = "";
 
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
-enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD6, GD7, GD8};
+enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD7, GD8};
 
-const char* ssid = "WiFi-DOM.ru-2463";
-const char* password = "89502657277";
+const char* ssid = "derwifi";
+const char* password = "daskennwort";
 
 // Create an instance of the server
 // specify the port to listen on as an argument
@@ -53,6 +53,11 @@ typedef struct {
   String startTime;
   String finishTime;
 } TimeExecution;
+
+typedef struct {
+  Time startTime();
+  Time finishTime();
+} TimeExec;
 
 typedef struct {
   sensor_name sensorName;
@@ -70,14 +75,13 @@ typedef struct {
 } LedSchedule;
 
 State sensors[8] = {
-   {LED_1, 0, D0, true},
-   {LED_2, 0, D1, true},
-   {LED_3, 0, D2, true},
-   {LED_4, 0, D4, true},
-   {GD5, 0, D5, false},
-   {GD6, 0, D6, false},
-   {GD7, 0, D7, false},
-   {GD8, 0, D8, true}
+   {LED_1, 0, D5, true},
+   {LED_2, 0, D6, true},
+   {LED_3, 0, D7, true},
+   {LED_4, 0, D8, true},
+   {GD5, 0, D4, false},
+   {GD7, 0, 9, false},
+   {GD8, 0, 10, true}
 };
 
 TimeExecution GD7TimeTable;
@@ -457,6 +461,16 @@ void DoSchedule(){
   }
 }
 
+/*void DoScheduleGD7(){
+  Time t = rtc.time();
+  if (((GD7Start.hr >= t.hr) && (GD7Finish.min >= t.min)) && ((GD7Finish.hr <= t.hr) && (GD7Finish.min <= t.min)))
+  {
+    sensors[GD7].value = 1;
+  }else{
+    sensors[GD7].value = 0;
+  }
+}*/
+
 String GetPage(){
   String page = "";
   page += "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n";
@@ -583,19 +597,6 @@ String GetPage(){
   page += "                <form action='/' method='POST'>";
   page += "                  <button type='button submit' name='GD5' value='0' class='btn btn-danger'>OFF</button>";
   page += "                </form>";
-  page += "              </div>";
-  page += "              <div class='col-md-4'>";
-  page += "                <h5 class='text-left'>";
-  page += "                  D6  <span class='badge badge-pill badge-";
-  page +=                   (sensors[GD6].value == 1) ? "primary" : "dark";
-  page += "                 '>Coller</span>";
-  page += "                </h5>";
-  page += "              </div>";
-  page += "              <div class='col-md-4'>";
-  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='1' class='btn btn-success'>ON</button></form>";
-  page += "              </div>";
-  page += "              <div class='col-md-4'>";
-  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='0' class='btn btn-danger'>OFF</button></form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
   page += "                <h5 class='text-left'>";
