@@ -41,8 +41,8 @@ String logString = "";
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
 enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD7, GD8};
 
-const char* ssid = "derwifi";
-const char* password = "daskennwort";
+const char* ssid = "WiFi-DOM.ru-2463"; 
+const char* password = "89502657277"; 
 
 // Create an instance of the server
 // specify the port to listen on as an argument
