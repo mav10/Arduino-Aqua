@@ -52,20 +52,20 @@
                 <div class='card-header'>Arduino info</div>
                 <div class='card-body'>
                   <h3 class='card-title'>Connection: ON</h3>
-                  <div class='row'>
-                    <div class='col-md-3'>
-                      <h6 class='card-title'>RAM: </h6>
-                    </div>
-                    <div class='col-md-9'>
-                      <div class='progress'>
-                        <div class='progress-bar bg-warning' role='progressbar' style='width: 75%' aria-valuenow='75' aria-valuemin='0' aria-valuemax='100'></div>
-                      </div>
-                    </div>
-                  </div>
+                  	<form action='/' method='POST' style='margin:0px'>
+							<button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>
+								Setup time
+							</button>
+							<button type='submit' name='clearAll' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>
+								Clear cash and logs
+							</button>
+					    </form>
                 </div>
-          <div class='card-footer'>
-         <small>Work duration:</small>
-           </div>
+			  <div class='card-footer'>
+				<small>
+					Work duration:
+				</small>
+			  </div>
               </div>
             </div>
           </div>
@@ -256,6 +256,34 @@
                 <input type='number' class='form-control' name='LEDchanel4' placeholder='255'>
               </div>
             </div>
+            <div class='modal-footer'>
+              <button type='reset' class='btn btn-secondary'>Reset</button>
+              <button type='submit' class='btn btn-primary'>Save</button>
+           </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+   <div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>
+    <div class='modal-dialog' role='document'>
+      <div class='modal-content'>
+        <div class='modal-header'>
+          <h4 class='modal-title'>Time's settings</h4>
+          <button type='button' class='close' data-dismiss='modal' aria-label='Close'>
+            <span aria-hidden='true'>&times;</span>
+          </button>
+        </div>
+        <div class='modal-body'>
+          <form action='/' method='POST'>
+            <div class='form-group row'>
+              <label for='colFormLabel' class='col-sm-2 col-form-label'>Time</label>
+              <div class='col-sm-10'>
+                <input type='time' class='form-control' name='SystemTime' placeholder='20:30'>
+              </div>
+            </div>
+            
             <div class='modal-footer'>
               <button type='reset' class='btn btn-secondary'>Reset</button>
               <button type='submit' class='btn btn-primary'>Save</button>
