@@ -72,7 +72,7 @@ LinkedList<LedSchedule> *timetable = new LinkedList<LedSchedule>();
 
 void Log(String text, logs_state status){
    String color[4] = {"black", "green", "yellow", "red"};
-  logString += "<p style='color:" + color[status] +"' >" + text + "</p>";
+  logString += "<p style='color:" + color[status] +"' >"  + "[" + getCurrentTime()+ "]" + text + "</p>";
 }
 
 int compare(LedSchedule& a, LedSchedule& b) {
@@ -106,15 +106,15 @@ void loop() {
 }
 
 String getCurrentTime(){
-  DateTime now = rtc.now();
-  String parsedMin = "";
-  if(now.minute() < 10 && String(now.minute(), DEC).length < 2){
-    parsedMin = String(0) + String(now.minute(), DEC);
+  DateTime nowtime = rtc.now();
+  String parsedMin = String();
+  if(nowtime.minute() < 10 && (String(nowtime.minute(), DEC).length() < 2)){
+    parsedMin = String(0) + String(nowtime.minute(), DEC);
   }
   else{
-    parsedMin = String(now.minute(), DEC);
+    parsedMin = String(nowtime.minute(), DEC);
   }
-  return String(now.hour(), DEC) + ":" + parsedMin;
+  return String(nowtime.hour(), DEC) + ":" + parsedMin;
 }
 
 void ConfigureClock(){
@@ -130,20 +130,20 @@ void ConfigureClock(){
     // January 21, 2014 at 3am you would call:
      //rtc.adjust(DateTime(2018, 7, 20, 22, 20, 0));
      }
- DateTime now = rtc.now();
+ DateTime nowTime = rtc.now();
     
     Serial.println("Chech time writing after configuring");  
-    Serial.print(now.year(), DEC);
+    Serial.print(nowTime.year(), DEC);
     Serial.print('/');
-    Serial.print(now.month(), DEC);
+    Serial.print(nowTime.month(), DEC);
     Serial.print('/');
-    Serial.print(now.day(), DEC);
+    Serial.print(nowTime.day(), DEC);
     Serial.print(' ');
-    Serial.print(now.hour(), DEC);
+    Serial.print(nowTime.hour(), DEC);
     Serial.print(':');
-    Serial.print(now.minute(), DEC);
+    Serial.print(nowTime.minute(), DEC);
     Serial.print(':');
-    Serial.print(now.second(), DEC);
+    Serial.print(nowTime.second(), DEC);
     Serial.println();
   
   Log("time: " + getCurrentTime(), NORMAL);
@@ -251,11 +251,33 @@ void ApplyCurrentState(){
 }
 
 void AssignCurrentLedValueFromTimeTable(int timeTableEventIndex){
-  sensors[LED_1].value = timetable->get(timeTableEventIndex).cahnel1;
-  sensors[LED_2].value = timetable->get(timeTableEventIndex).cahnel2;
-  sensors[LED_3].value = timetable->get(timeTableEventIndex).cahnel3;
-  sensors[LED_4].value = timetable->get(timeTableEventIndex).cahnel4;
+  int nextToIndex = (timeTableEventIndex < timetable->size() -1) ? timeTableEventIndex + 1 : 0;
+  String currentTime = getCurrentTime();
+  int timeFrom = timeToSeconds(timetable->get(timeTableEventIndex).timeExecute);
+  int timeTo = timeToSeconds(timetable->get(nextToIndex).timeExecute);
+  
+  int curTime = timeToSeconds(currentTime);
+
+
+  
+   int val1 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel1);
+   int val2 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel2);
+   int val3 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel3);
+   int val4 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel4);
+  
+  sensors[LED_1].value = val1;
+  sensors[LED_2].value = val2;
+  sensors[LED_3].value = val3;
+  sensors[LED_4].value = val4;
 }
+
+int timeToSeconds(String incomingTime){
+  int separatorIndex = incomingTime.indexOf(":");
+  int hours = incomingTime.substring(0, separatorIndex).toInt();
+  int minutes = incomingTime.substring(separatorIndex + 1).toInt();
+
+  return (hours * 60) + minutes;
+ }
 
 void PerformRequestedCommands() {
   readString = buffer;
@@ -351,13 +373,23 @@ String WriteLedTable(){
 void DoSchedule(){
   String currentTime = getCurrentTime();
   timetable->sort(compare);
-  for(int i = 0; i < timetable->size() - 1; i++){
-    if ((timetable->get(i).timeExecute <= currentTime) && (currentTime < timetable->get(i+1).timeExecute)) {
-      //todo: add smoozhy value increase
+  int leng = timetable->size();
+  for(int i = 0; i < leng - 1; i++){
+    if ((String(timetable->get(i).timeExecute) <= String(currentTime)) && (String(currentTime) < String(timetable->get(i+1).timeExecute))) {
+      Serial.print("current " + currentTime);
+      Serial.print("timeTableSatrt " + timetable->get(i).timeExecute);
+      Serial.println("timeTableEnd " + timetable->get(i+1).timeExecute);
       AssignCurrentLedValueFromTimeTable(i);
     }
   }
-  if ((GD7TimeTable.startTime >= currentTime) && (GD7TimeTable.finishTime <= currentTime))
+  if ((String(currentTime) > String(timetable->get(leng -1).timeExecute)) && (String(timetable->get(0).timeExecute) >= String(currentTime))){
+    //TODO: цикл замскнулся
+     AssignCurrentLedValueFromTimeTable(leng -1);
+  }
+
+  bool MoreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
+  bool LessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
+  if (MoreThenStart && LessThenFinish)
   {
     sensors[GD7].value = 1;
   }else{
