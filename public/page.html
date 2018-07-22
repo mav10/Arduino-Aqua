@@ -50,22 +50,18 @@
             <div class='col-md-4'>
               <div class='card text-white bg-info mb-3'>
                 <div class='card-header'>Arduino info</div>
-                <div class='card-body'>
-                  <h3 class='card-title'>Connection: ON</h3>
-                  	<form action='/' method='POST' style='margin:0px'>
-							<button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>
-								Setup time
-							</button>
-							<button type='submit' name='clearAll' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>
-								Clear cash and logs
-							</button>
-					    </form>
-                </div>
-			  <div class='card-footer'>
-				<small>
-					Work duration:
-				</small>
-			  </div>
+  <div class='card-body'>
+                    <h3 class='card-title'>Connection: ON</h3>
+                      <form action='/' method='POST' style='margin:0px'>
+                         <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>
+                         <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>
+                     </form>
+                  </div>
+          <div class='card-footer'>
+           <small>Work duration:
+  page +=             GetCurrentTime();
+           </small>
+           </div>
               </div>
             </div>
           </div>
@@ -99,28 +95,7 @@
                 </tr>
               </thead>
               <tbody>
-  <!--page +=                WriteLedTable();-->
-				  <tr>
-					<td>8:00</td>
-					<td>123</td>
-					<td>220</td>
-					<td>255</td>
-					<td>123</td>
-				  </tr>
-				  <tr>
-					<td>10:20</td>
-					<td>230</td>
-					<td>108</td>
-					<td>43</td>
-					<td>108</td>
-				  </tr>
-				  <tr>
-					<td>12:27</td>
-					<td>100</td>
-					<td>87</td>
-					<td>25</td>
-					<td>25</td>
-				  </tr>
+  page +=                WriteLedTable();
               </tbody>
             </table>
           </div>
@@ -132,29 +107,33 @@
               <div class='row'>
                 <div class='col-md-4'>
                   <h5 class='text-left'>
-                    D5  <span class='badge badge-pill badge-primary'>Light</span>
+                    D5  <span class='badge badge-pill badge-
+                     (sensors[GD5].value == 1) ? "primary" : "dark
+                   '>Light</span>
                   </h5>
                 </div>
                 <div class='col-md-4'>
                   <form action='/' method='POST'>
-                    <button type='button submit' name='D5' value='1' class='btn btn-success'>ON</button>
+                    <button type='button submit' name='GD5' value='1' class='btn btn-success'>ON</button>
                   </form>
                 </div>
                 <div class='col-md-4'>
                   <form action='/' method='POST'>
-                    <button type='button submit' name='D5' value='0' class='btn btn-danger'>OFF</button>
+                    <button type='button submit' name='GD5' value='0' class='btn btn-danger'>OFF</button>
                   </form>
                 </div>
                 <div class='col-md-4'>
                   <h5 class='text-left'>
-                   D6  <span class='badge badge-pill badge-primary'>Cooler</span>
+                    D6  <span class='badge badge-pill badge-
+						(sensors[GD6].value == 1) ? "primary" : "dark
+                   '>Coller</span>
                   </h5>
                 </div>
                 <div class='col-md-4'>
-                  <form action='/' method='POST'><button type='button submit' name='D6' value='1' class='btn btn-success'>ON</button></form>
+                  <form action='/' method='POST'><button type='button submit' name='GD6' value='1' class='btn btn-success'>ON</button></form>
                 </div>
                 <div class='col-md-4'>
-                  <form action='/' method='POST'><button type='button submit' name='D6' value='0' class='btn btn-danger'>OFF</button></form>
+                  <form action='/' method='POST'><button type='button submit' name='GD6' value='0' class='btn btn-danger'>OFF</button></form>
                 </div>
                 <div class='col-md-4'>
                   <h5 class='text-left'>
@@ -165,13 +144,13 @@
                 <form action='/' method='POST'>
                  <div class='row'>
                     <div class='col-md-5'>
-                      <input type='time' class='form-control' name='D7timeStart' value='" + D7TimeTable.startTime + "' placeholder='20:30'>
+                      <input type='time' class='form-control' name='GD7timeStart' value='" + GD7TimeTable.startTime + "' placeholder='20:30'>
                     </div>
                     <div class='col-md-2'>
                       <p> -> </p>
                     </div>
                     <div class='col-md-5'>
-                       <input type='time' class='form-control' name='D7timeEnd' value='" + D7TimeTable.finishTime + "' placeholder='20:30'>
+                       <input type='time' class='form-control' name='GD7timeEnd' value='" + GD7TimeTable.finishTime + "' placeholder='20:30'>
                      </div>
                  </div>
                  <button type='submit' class='btn btn-info btn-sm btn-block'>SEND</button>
@@ -183,14 +162,17 @@
                   </h5>
                 </div>
                 <div class='col-md-4'>
-                    <input id='D8ex' data-slider-id='ex1Slider' type='button submit' data-slider-min='0' data-slider-max='1023' data-slider-step='1' style='width:100px' data-slider-value='0' />
-                    <span id='ex6CurrentSliderValLabel'>Value: <span id='D8exVal'>
-  page +=                       sensors[D8].value;
+					<!--Add to data-slider-value sensors[GD8].value in arduino CODE-->
+                    <input id='GD8ex' data-slider-id='ex1Slider' type='button submit' data-slider-min='0' data-slider-max='1023' data-slider-step='1' style='width:100px' data-slider-value='
+                       0
+                     ' />
+                    <span id='ex6CurrentSliderValLabel'>Value: <span id='GD8exVal'>
+  page +=                       sensors[GD8].value;
                      </span></span>
                 </div>
                 <div class='col-md-4'>
                   <form action='/' method='POST'>
-                    <button id='D8Button' type='button submit' name='D8' value='0' class='btn btn-info btn-sm'>SEND</button>
+                    <button id='GD8Button' type='button submit' name='GD8' value='0' class='btn btn-info btn-sm'>SEND</button>
                   </form>
                 </div>
               </div>
@@ -266,7 +248,7 @@
     </div>
   </div>
   
-   <div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>
+  <div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>
     <div class='modal-dialog' role='document'>
       <div class='modal-content'>
         <div class='modal-header'>
@@ -293,7 +275,6 @@
       </div>
     </div>
   </div>
-  
     <script type='text/javascript'>
       Highcharts.chart('LedContainer', {
         data: {
@@ -321,17 +302,17 @@
     </script>
     <script type='text/javascript'>
         $(document).ready(function () {
-            $('#D8ex').slider({
+            $('#GD8ex').slider({
                 formatter: function (value) {
                     return 'Current value: ' + value;
                 },
                 tooltip: 'always'
             });
-            $('#D8ex').on('slide', function(slideEvt) {
-             $('#D8exVal').text(slideEvt.value);
-              $('#D8Button').attr('value', slideEvt.value);
+            $('#GD8ex').on('slide', function(slideEvt) {
+             $('#GD8exVal').text(slideEvt.value);
+              $('#GD8Button').attr('value', slideEvt.value);
             });
         });
     </script>
   </body>
-  </html>
+ </html>
