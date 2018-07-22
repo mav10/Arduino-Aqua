@@ -1,42 +1,36 @@
+#include <LinkedList.h>
+#include <Wire.h>
+#include <DS1302.h>
+#include <ESP8266WiFi.h>
+#include <String.h> // Для strcmp
 /*
- *  This sketch manages of devices for aquarium automatisation.
- *  The server will set a GPIO pins depending on the request
- *  The Server is available by
- *    http://server_ip/
- *   and has got a  static html page via you can swith on/off some pins and watch some information.
- *   all requests (most part of them is performed via POST requests)
- *  Avaliable commands and pereferyies:
- *   - 4 LED controller:
- *   - - Time schedule execution for every channel
- *   - - - P.S. this pins assigned as PWM.
- *  - GPIO 5, GPIO 6:
- *  - - You can only swith on/off devices which connected to this pins
- *  - GPIO 7:
- *  - - This is also swith on/off function, but it works only during the configured time
- *  - GPIO 8:
- *  - - It's a PWM pinout, and you can configure value by the slider.
- *  - Also you can watch Arduino current time (from RTC module) and re-configure them.
- *  - As we have got static page with some arrays and strings etc. so is needed to clear cashe to release RAM.
+ *  This sketch demonstrates how to set up a simple HTTP-like server.
+ *  The server will set a GPIO pin depending on the request
+ *    http://server_ip/gpio/0 will set the GPIO2 low,
+ *    http://server_ip/gpio/1 will set the GPIO2 high
  *  server_ip is the IP address of the ESP8266 module, will be 
  *  printed to Serial when the module is connected.
  *  
  *  Sorting was downloaded here https://github.com/ivanseidel/LinkedList
- *  Rtc lib could be downloaded via Arduino MarketPlace "RTClib by Adafruit"
- *  
- *  Actualy, all libs there are in folder and you can include them via library manager (.zip setupper)
-*/
-#include <LinkedList.h>
-#include <Wire.h>
-#include <RTClib.h>
-#include <ESP8266WiFi.h>
-#include <String.h>
+ *  Rtc lib cpulld be downloaded via Arduino Market place "RTClib by Adafruit"
+ */
+
+// Set the appropriate digital I/O pin connections. These are the pin
+// assignments for the Arduino as well for as the DS1302 chip. See the DS1302
+// datasheet:
+//
+//   http://datasheets.maximintegrated.com/en/ds/DS1302.pdf
+const int kCePin   = D0;  // Chip Enable
+const int kIoPin   = D1;  // Input/Output
+const int kSclkPin = D2;  // Serial Clock
 
 #define bufferMax 128
 int bufferSize;
 char buffer[bufferMax];
-char post;
 String readString = String(128);
-String logString = "";
+char post;
+
+DS1302 rtc(kCePin, kIoPin, kSclkPin);
 
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
 enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD7, GD8};
@@ -44,10 +38,11 @@ enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD7, GD8};
 const char* ssid = "WiFi-DOM.ru-2463"; 
 const char* password = "89502657277"; 
 
+String logString = "";
+
 // Create an instance of the server
 // specify the port to listen on as an argument
 WiFiServer server(80);
-RTC_DS3231 rtc;
 
 typedef struct {
   String startTime;
@@ -68,10 +63,10 @@ typedef struct {
 
 typedef struct {
   String timeExecute;
-  int channel1;
-  int channel2;
-  int channel3;
-  int channel4;
+  int cahnel1;
+  int cahnel2;
+  int cahnel3;
+  int cahnel4;
 } LedSchedule;
 
 State sensors[8] = {
@@ -85,7 +80,22 @@ State sensors[8] = {
 };
 
 TimeExecution GD7TimeTable;
+Time GD7Start();
+Time GD7Finish();
+
 LinkedList<LedSchedule> *timetable = new LinkedList<LedSchedule>();
+
+void Log(String text, logs_state status){
+   String color[4] = {"black", "green", "yellow", "red"};
+  logString += "<p style='color:" + color[status] +"' >" +"[" + getCurrentTime()+ "]" + text + "</p>";
+}
+
+int compare(LedSchedule& a, LedSchedule& b) {
+  if(a.timeExecute > b.timeExecute){
+    return 1;
+  }
+  return -1;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -93,15 +103,15 @@ void setup() {
   Serial.println();
   Serial.println("start configuring");
 
-  InitializeLeds();
-
   delay(10);
   ConfigureClock();
   ConfigureGpio();
   ConfigureWiFi();
+ 
 }
 
 void loop() {
+  
   ApplyCurrentState();
   delay(1);
   // Send the response to the client
@@ -110,82 +120,37 @@ void loop() {
   DoSchedule();
 }
 
-String GetCurrentTime(){
-  DateTime nowtime = rtc.now();
-  String parsedMin = String();
-
-  //TODO: little hack for displaying 00:01
-  if(nowtime.minute() < 10 && (String(nowtime.minute(), DEC).length() < 2)){
-    parsedMin = String(0) + String(nowtime.minute(), DEC);
-  }
-  else{
-    parsedMin = String(nowtime.minute(), DEC);
-  }
-  return String(nowtime.hour(), DEC) + ":" + parsedMin;
+String getCurrentTime(){
+   // Get the current time and date from the chip.
+  Time t = rtc.time();
+  return String(t.hr, DEC) + ":" + String(t.min, DEC);
 }
 
-void LOG(String text, logs_state status){
-   String color[4] = {"black", "green", "yellow", "red"};
-  logString += "<p style='color:" + color[status] +"' >"  + "[" + GetCurrentTime()+ "]: " + text + "</p>";
+void ConfigureClock(){
+  // Initialize a new chip by turning off write protection and clearing the
+  // clock halt flag. These methods needn't always be called. See the DS1302
+  // datasheet for details.
+  rtc.writeProtect(false);
+  rtc.halt(false);
 
-  Serial.println("LOG :[" + GetCurrentTime() + "]: " + text);
-}
+  // Make a new time object to set the date and time.
+  // Sunday, September 22, 2013 at 01:38:50.
+  Time t(2018, 7, 21, 12, 30, 0, Time::kSunday);
 
-int Compare(LedSchedule& a, LedSchedule& b) {
-  if(a.timeExecute > b.timeExecute){
-    return 1;
-  }
-  return -1;
-}
-
-void ConfigureClock() {
-  if (! rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    while(1);
-  }
-
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, lets set the time!");
-    // following line sets the RTC to the date & time this sketch was compiled
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // July 20, 2018 at 22:20 you would call:
-    //rtc.adjust(DateTime(2018, 7, 20, 22, 20, 0));
-  }
-  CheckSystemTime();
-}
-
-void CheckSystemTime(){
-  DateTime nowTime = rtc.now();
+  // Set the time and date on the chip.
+  rtc.time(t);
   
-  LOG("Chech the time after configuring", WARNING);  
- 
-  LOG("system time: "
-    + String(nowTime.year(), DEC)
-    + "/"
-    + String(nowTime.month(), DEC)
-    + "/"
-    + String(nowTime.day(), DEC)
-    + " "
-    + String(nowTime.hour(), DEC)
-    + ":"
-    + String(nowTime.minute(), DEC)
-    + ":"
-    + String(nowTime.second(), DEC)
-    , NORMAL);
-  LOG("programm time: " + GetCurrentTime(), NORMAL);
-
-  if(GetCurrentTime().length() != 5){
-    LOG("Programm time format has been wrong!"
-        + GetCurrentTime()
-        + " Check the RTC module"
-       , DANGER);
-  }
+  Log("time: " + getCurrentTime(), NORMAL);
 }
 
 void ConfigureWiFi(){
-  LOG("Connecting to ", NORMAL);
-  LOG(ssid, NORMAL);
+    // Connect to WiFi network
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  
+  Log("Connecting to ", NORMAL);
+  Log(ssid, NORMAL);
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -194,24 +159,22 @@ void ConfigureWiFi(){
     delay(500);
     Serial.print(".");
   }
-  Serial.println();
+  Serial.println("");
+  Serial.println("WiFi connected");
 
-  LOG("WiFi connected", SUCCESS);
-  
+  Log("WiFi connected", SUCCESS);
   // Start the server
   server.begin();
-  LOG("Server started", SUCCESS);
-  LOG(WiFi.localIP().toString(), NORMAL);
+  Log("Server started", SUCCESS);
+  Log(WiFi.localIP().toString(), NORMAL);
+  
+  // Print the IP address
+  Serial.println(WiFi.localIP()); 
 }
 
 void ConfigureGpio(){
-  LOG("Configure GPIO", WARNING);
+  Serial.println("configure GPIO...");
   ApplyCurrentState();
-}
-
-void InitializeLeds(){
-  timetable->add({"08:00", 100, 100, 100, 100}); 
-  timetable->add({"09:00", 200, 200, 200, 200}); 
 }
 
 void getPostRequest() {
@@ -224,25 +187,24 @@ void getPostRequest() {
     while (client.connected()) {
       if(client.available()){
         char c = client.read();
-        // if you got the newLine symbol
-        // and empty string symbol, the POST-request has been finished
-        // so you can send response
+        // если вы получили символ новой строки
+        // и символ пустой строки, то POST запрос закончился
+        // и вы можете отправить ответ
         if (c == '\n' && currentLineIsBlank) {
-          // DATA from POST request
+          // Здесь содержатся данные POST запроса 
           while(client.available()) {  
             post = client.read();   
             if(bufferSize < bufferMax)
-              buffer[bufferSize++] = post;  // add new symbol to the buffer
+              buffer[bufferSize++] = post;  // сохраняем новый символ в буфере и создаем приращение bufferSize 
           }
 
           client.flush();
           Serial.println("Received POST request:");
+          // Разбор HTTP POST запроса                  
           Serial.println(buffer);
-
-          //Do some commands
+          // Выполнение команд
           PerformRequestedCommands();
-
-          //Send request with new state
+          // Отправка ответа
           client.print(GetPage());
           client.stop();
         } 
@@ -256,18 +218,17 @@ void getPostRequest() {
     }
     memset(buffer, 0, sizeof(buffer)/sizeof(char));
     readString = "";
+    
+    Serial.println("Port closed");
   }
 }
 
 void UpdatePinValue(sensor_name sensorName, int value) {
   if(sensors[sensorName].sensorName == sensorName){
-    int oldValue = sensors[sensorName].value;
-    if(oldValue != value){
-      sensors[sensorName].value = value;
-      LOG(String(sensorName) + " sensor was updated from " + String(oldValue) + " to " + String(value), SUCCESS);
-    }
+    sensors[sensorName].value = value;
+    Log(String(sensorName) + " sensor was updated to " + String(value), SUCCESS);
   }else{
-    LOG(String(sensorName) + " sensor was not updated. There are name conflict", DANGER);
+    Log(String(sensorName) + " sensor was not updated", DANGER);
   }
 }
 
@@ -284,53 +245,61 @@ void ApplyCurrentState(){
 }
 
 void AssignCurrentLedValueFromTimeTable(int timeTableEventIndex){
-  int nextToIndex = (timeTableEventIndex < timetable->size() - 1) ? timeTableEventIndex + 1 : 0;
-  String currentTime = GetCurrentTime();
-  int timeFrom = TimeToMinutes(timetable->get(timeTableEventIndex).timeExecute);
-  int timeTo = TimeToMinutes(timetable->get(nextToIndex).timeExecute);
-  
-  int curTime = TimeToMinutes(currentTime);
-  
-  int val1 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).channel1, timetable->get(nextToIndex).channel1);
-  int val2 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).channel2, timetable->get(nextToIndex).channel2);
-  int val3 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).channel3, timetable->get(nextToIndex).channel3);
-  int val4 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).channel4, timetable->get(nextToIndex).channel4);
 
-  UpdatePinValue(LED_1, val1);
-  UpdatePinValue(LED_2, val2);
-  UpdatePinValue(LED_3, val3);
-  UpdatePinValue(LED_4, val4);
+  int nextToIndex = (timeTableEventIndex < timetable->size() -1) ? timeTableEventIndex + 1 : 0;
+  String currentTime = getCurrentTime();
+  int timeFrom = timeToSeconds(timetable->get(timeTableEventIndex).timeExecute);
+  int timeTo = timeToSeconds(timetable->get(nextToIndex).timeExecute);
+  
+  int curTime = timeToSeconds(currentTime);
+
+
+  
+   int val1 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel1);
+   int val2 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel2);
+   int val3 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel3);
+   int val4 = map(curTime, timeFrom, timeTo, timetable->get(timeTableEventIndex).cahnel1, timetable->get(nextToIndex).cahnel4);
+  
+  sensors[LED_1].value = val1;
+  sensors[LED_2].value = val2;
+  sensors[LED_3].value = val3;
+  sensors[LED_4].value = val4;
 }
 
-int TimeToMinutes(String incomingTime){
+void smoozieLoad(int start, int next){
+  String currentTime = getCurrentTime();
+  int timeFrom = timeToSeconds(timetable->get(start).timeExecute);
+  int timeTo = timeToSeconds(timetable->get(next).timeExecute);
+  
+  int curTime = timeToSeconds(currentTime);
+
+
+  
+   int val1 = map(curTime, timeFrom, timeTo, timetable->get(start).cahnel1, timetable->get(next).cahnel1);
+   int val2 = map(curTime, timeFrom, timeTo, timetable->get(start).cahnel1, timetable->get(next).cahnel2);
+   int val3 = map(curTime, timeFrom, timeTo, timetable->get(start).cahnel1, timetable->get(next).cahnel3);
+   int val4 = map(curTime, timeFrom, timeTo, timetable->get(start).cahnel1, timetable->get(next).cahnel4);
+  
+}
+
+int timeToSeconds(String incomingTime){
   int separatorIndex = incomingTime.indexOf(":");
   int hours = incomingTime.substring(0, separatorIndex).toInt();
   int minutes = incomingTime.substring(separatorIndex + 1).toInt();
 
-  if((hours > 24 || hours < 0) ||(minutes > 59 || minutes < 0)){
-    LOG("Something is wrong with time. Hours couldn't be more then 24 or negative. Minutes couldn't be more then 59 or negative. Please check your RTC module", DANGER);
-  }
-  
   return (hours * 60) + minutes;
- }
+}
 
 void PerformRequestedCommands() {
   readString = buffer;
   if(readString.indexOf("GD5") != -1) { 
-    int value = GetValueFromHtmlForm("GD5", readString).toInt();
+    int value = getValueFromHtmlForm("GD5", readString).toInt();
     UpdatePinValue(GD5, value);              
-  } else if(readString.indexOf("GD6") != -1) {
-    int value = GetValueFromHtmlForm("GD6", readString).toInt();
-    UpdatePinValue(GD6, value);
   } else if(readString.indexOf("GD8") != -1) {
-    int value = GetValueFromHtmlForm("GD8", readString).toInt();
+    int value = getValueFromHtmlForm("GD8", readString).toInt();
     UpdatePinValue(GD8, value);
   }else if(readString.indexOf("GD7") != -1) {
-    saveGD7TimeSchedule(readString);
-  }else if(readString.indexOf("SystemTime") != -1) {
-    SetupTime(readString);
-  }else if(readString.indexOf("clearAll") != -1) {
-    ClearCache();
+    saveGD7TimeShcedule(readString);
   }else if(readString.indexOf("LED") != -1) {
     PerformNewLedEvent(readString);
   }else if (readString.indexOf("clearTimeTable") != -1){
@@ -340,77 +309,51 @@ void PerformRequestedCommands() {
   }
 }
 
-void ClearCache() {
-  post = ' ';
-  logString = "";
-  readString = "";
-  memset(buffer, 0, sizeof(buffer)/sizeof(char));
-}
-
 void PerformNewLedEvent(String requestBody) {
-  int chanel1 = GetValueFromHtmlForm("LEDchanel1", requestBody).toInt();
-  int chanel2 = GetValueFromHtmlForm("LEDchanel2", requestBody).toInt();
-  int chanel3 = GetValueFromHtmlForm("LEDchanel3", requestBody).toInt();
-  int chanel4 = GetValueFromHtmlForm("LEDchanel4", requestBody).toInt();
+  int chanel1 = getValueFromHtmlForm("LEDchanel1", requestBody).toInt();
+  int chanel2 = getValueFromHtmlForm("LEDchanel2", requestBody).toInt();
+  int chanel3 = getValueFromHtmlForm("LEDchanel3", requestBody).toInt();
+  int chanel4 = getValueFromHtmlForm("LEDchanel4", requestBody).toInt();
 
-  String timeSetup = ParseTime(requestBody, "LEDtime", "&LEDchanel1"); 
+  String timeSetup = parseLedTime(requestBody, "LEDtime", "&LEDchanel1"); 
 
-  timetable->add({timeSetup, chanel1, chanel2, chanel3, chanel4});
-  LOG("Added new event for LED. Execition time starts at "
-    + timeSetup
-    + " ch1: " + chanel1
-    + " ch2: " + chanel2
-    + " ch3: " + chanel3
-    + " ch4: " + chanel4
-    , SUCCESS);
+  timetable->add({timeSetup, chanel1, chanel2, chanel3, chanel4});  
 }
 
-String ParseTime(String requestBody, String patternStart, String patternEnd){
-  String parsedTime = GetValueFromHtmlForm(patternStart, requestBody);
-  parsedTime = parsedTime.substring(0, parsedTime.indexOf(patternEnd));
-  parsedTime.replace("%3A", ":");
-  return parsedTime;
+String parseLedTime(String requestBody, String patternStart, String patternEnd){
+  String Time = getValueFromHtmlForm(patternStart, requestBody);
+  Time = Time.substring(0, Time.indexOf(patternEnd));
+  Time.replace("%3A", ":");
+  return Time;
 }
 
-void saveGD7TimeSchedule(String requestBody){
-  String startTime = GetValueFromHtmlForm("timeStart", requestBody);
+void saveGD7TimeShcedule(String requestBody){
+  Serial.print("incoming ");
+  Serial.println(requestBody);
+  String startTime = getValueFromHtmlForm("timeStart", requestBody);
+  Serial.print("parsed ");
+  Serial.println(startTime);
   startTime = startTime.substring(0, startTime.indexOf("&GD7timeEnd"));
-  String endTime = GetValueFromHtmlForm("timeEnd", requestBody);
+  Serial.print("parsed substr");
+  Serial.println(startTime);
+  String endTime = getValueFromHtmlForm("timeEnd", requestBody);
 
   startTime.replace("%3A", ":");
   endTime.replace("%3A", ":");
-  GD7TimeTable = {startTime, endTime}; 
 
-  LOG("Added new event for timeDepends GPIO. Time of execution " + startTime + " - " + endTime, SUCCESS);
+  //Time curTime = rtc.time();
+  //Time tStart(curTime.yr, curTime.mon, curTime.date, 12, 30, 0, Time::kSunday);
+  //Time tFinish(curTime.yr, curTime.mon, curTime.date, 14, 30, 0, Time::kSunday);
+  GD7TimeTable = {startTime, endTime};
 }
 
-void SetupTime(String requestBody){
-  String newTime = ParseTime(requestBody, "SystemTime", "");
-  newTime.replace("%3A", ":");
-  int index = newTime.indexOf(":");
-  int hoursNumber =  newTime.substring(0, index).toInt();
-  int minNumber = newTime.substring(index + 1).toInt();
-  /* TODO: 
-   * right now as you can see data (21th July 2018 is mocked)
-   * later will be configurable from UI part too.
-   */
-  LOG("Received time params Hours: "
-        + String(hoursNumber)
-        + ", Minutes: "
-        + String(minNumber)
-      , SUCCESS);
-  rtc.adjust(DateTime(2018, 7, 21, hoursNumber, minNumber, 0));
-  LOG("Time was reconfigured", NORMAL);
-  CheckSystemTime();
-}
-
-String GetValueFromHtmlForm(String gpioName, String requestBody){
+String getValueFromHtmlForm(String gpioName, String requestBody){
   int startIndex = requestBody.indexOf(gpioName + "=");
-  return requestBody.substring(startIndex + gpioName.length() + 1);
+    return requestBody.substring(startIndex + gpioName.length() + 1);
 }
 
 String WriteLedTable(){
-  timetable->sort(Compare);
+  timetable->sort(compare);
   String row = "";
   for(int i = 0; i < timetable->size(); i++) {
       row += "              <tr>";
@@ -418,16 +361,16 @@ String WriteLedTable(){
       row +=                    timetable->get(i).timeExecute;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable->get(i).channel1;
+      row +=                    timetable->get(i).cahnel1;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable->get(i).channel2;
+      row +=                    timetable->get(i).cahnel2;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable->get(i).channel3;
+      row +=                    timetable->get(i).cahnel3;
       row +=                  "</td>";
       row += "                <td>";
-      row +=                    timetable->get(i).channel4;
+      row +=                    timetable->get(i).cahnel4;
       row +=                  "</td>";
       row += "              </tr>";
   }
@@ -435,11 +378,12 @@ String WriteLedTable(){
 }
 
 void DoSchedule(){
-  String currentTime = GetCurrentTime();
-  timetable->sort(Compare);
+  String currentTime = getCurrentTime();
+  timetable->sort(compare);
   int leng = timetable->size();
   for(int i = 0; i < leng - 1; i++){
     if ((String(timetable->get(i).timeExecute) <= String(currentTime)) && (String(currentTime) < String(timetable->get(i+1).timeExecute))) {
+      //todo: add smoozhy value increase
       Serial.print("current " + currentTime);
       Serial.print("timeTableSatrt " + timetable->get(i).timeExecute);
       Serial.println("timeTableEnd " + timetable->get(i+1).timeExecute);
@@ -447,17 +391,17 @@ void DoSchedule(){
     }
   }
   if ((String(currentTime) > String(timetable->get(leng -1).timeExecute)) && (String(timetable->get(0).timeExecute) >= String(currentTime))){
-    //TODO: we have to repeat loop again
-    AssignCurrentLedValueFromTimeTable(leng -1);
+    //TODO: цикл замскнулся
+     AssignCurrentLedValueFromTimeTable(leng -1);
   }
 
-  bool moreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
-  bool lessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
-  if (moreThenStart && lessThenFinish)
+  bool MoreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
+  bool LessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
+  if (MoreThenStart && LessThenFinish)
   {
-    UpdatePinValue(GD7, 1);
+    sensors[GD7].value = 1;
   }else{
-    UpdatePinValue(GD7, 0);
+    sensors[GD7].value = 0;
   }
 }
 
@@ -526,16 +470,22 @@ String GetPage(){
   page += "          <div class='col-md-4'>";
   page += "            <div class='card text-white bg-info mb-3'>";
   page += "              <div class='card-header'>Arduino info</div>";
-  page += "<div class='card-body'>";
-  page += "                  <h3 class='card-title'>Connection: ON</h3>";
-  page += "                    <form action='/' method='POST' style='margin:0px'>";
-  page += "                       <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
-  page += "                       <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>";
-  page += "                   </form>";
+  page += "              <div class='card-body'>";
+  page += "                <h3 class='card-title'>Connection: ON</h3>";
+  page += "                <div class='row'>";
+  page += "                  <div class='col-md-3'>";
+  page += "                    <h6 class='card-title'>RAM: </h6>";
+  page += "                  </div>";
+  page += "                  <div class='col-md-9'>";
+  page += "                    <div class='progress'>";
+  page += "                      <div class='progress-bar bg-warning' role='progressbar' style='width: 75%' aria-valuenow='75' aria-valuemin='0' aria-valuemax='100'></div>";
+  page += "                    </div>";
+  page += "                  </div>";
   page += "                </div>";
+  page += "              </div>";
   page += "        <div class='card-footer'>";
   page += "         <small>Work duration:";
-  page +=             GetCurrentTime();
+  page +=             getCurrentTime();
   page += "         </small>";
   page += "         </div>";
   page += "            </div>";
@@ -710,33 +660,6 @@ String GetPage(){
   page += "  </div>";
   page += "</div>";
   page += "";
-  page += "<div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>";
-  page += "    <div class='modal-dialog' role='document'>";
-  page += "      <div class='modal-content'>";
-  page += "        <div class='modal-header'>";
-  page += "          <h4 class='modal-title'>Time's settings</h4>";
-  page += "          <button type='button' class='close' data-dismiss='modal' aria-label='Close'>";
-  page += "            <span aria-hidden='true'>&times;</span>";
-  page += "          </button>";
-  page += "        </div>";
-  page += "        <div class='modal-body'>";
-  page += "          <form action='/' method='POST'>";
-  page += "            <div class='form-group row'>";
-  page += "              <label for='colFormLabel' class='col-sm-2 col-form-label'>Time</label>";
-  page += "              <div class='col-sm-10'>";
-  page += "                <input type='time' class='form-control' name='SystemTime' placeholder='20:30'>";
-  page += "              </div>";
-  page += "            </div>";
-  page += "            ";
-  page += "            <div class='modal-footer'>";
-  page += "              <button type='reset' class='btn btn-secondary'>Reset</button>";
-  page += "              <button type='submit' class='btn btn-primary'>Save</button>";
-  page += "           </div>";
-  page += "          </form>";
-  page += "        </div>";
-  page += "      </div>";
-  page += "    </div>";
-  page += "  </div>";
   page += "  <script type='text/javascript'>";
   page += "    Highcharts.chart('LedContainer', {";
   page += "      data: {";

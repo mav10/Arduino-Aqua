@@ -1,0 +1,283 @@
+<html charset=UTF-8>
+  <head>
+    <meta http-equiv='Content-Type' content='text/html, charset=utf-8'/> 
+    <meta name='viewport' content='width=device-width, initial-scale=0.8'>
+    <script src='https://code.jquery.com/jquery-3.2.1.slim.min.js' integrity='sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN' crossorigin='anonymous'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js' integrity='sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q' crossorigin='anonymous'></script>
+    <script src='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js' integrity='sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl' crossorigin='anonymous'></script>
+    <script src='https://code.highcharts.com/highcharts.js'></script>
+    <script src='https://code.highcharts.com/modules/data.js'></script>
+    <script src='https://code.highcharts.com/modules/exporting.js'></script>
+    <script src='https://code.highcharts.com/modules/export-data.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/bootstrap-slider.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/bootstrap-slider.js'></script>
+    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/css/bootstrap-slider.min.css' />
+    <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/css/bootstrap-slider.css' />
+    <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>
+    <title>Arduino Dashboard</title>
+  </head>
+  <body>
+    <div class='container-fluid'>
+      <div class='row'>
+        <div class='col-md-12'>
+          <h1>Dashboard</h1>
+          <!-- Temperature section -->
+          <div class='row'>
+            <div class='col-md-4'>
+              <div class='card text-white bg-dark mb-3'>
+                <div class='card-header'>Room's temperature</div>
+                <div class='card-body'>
+                  <h2 class='card-title'>21 &#8451;</h2>
+                  <p class='card-text'>Chart is unavailable</p>
+                </div>
+                <div class='card-footer'>
+                  <small class='text-muted'>Refreshed: 3 second ago</small>
+                </div>
+              </div>
+            </div>
+            <div class='col-md-4'>
+              <div class='card text-white bg-dark mb-3'>
+                <div class='card-header'>Water's temperature</div>
+                <div class='card-body'>
+                  <h2 class='card-title'>17 &#8451;</h2>
+                  <p class='card-text'>Chart is unavailable</p>
+                </div>
+                <div class='card-footer'>
+                  <small class='text-muted'>Refreshed: 3 second ago</small>
+                </div>
+              </div>
+            </div>
+            <div class='col-md-4'>
+              <div class='card text-white bg-info mb-3'>
+                <div class='card-header'>Arduino info</div>
+                <div class='card-body'>
+                  <h3 class='card-title'>Connection: ON</h3>
+                  <div class='row'>
+                    <div class='col-md-3'>
+                      <h6 class='card-title'>RAM: </h6>
+                    </div>
+                    <div class='col-md-9'>
+                      <div class='progress'>
+                        <div class='progress-bar bg-warning' role='progressbar' style='width: 75%' aria-valuenow='75' aria-valuemin='0' aria-valuemax='100'></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+          <div class='card-footer'>
+           <small>Work duration:
+  page +=             getCurrentTime();
+           </small>
+           </div>
+              </div>
+            </div>
+          </div>
+          <!-- End of temp section-->
+          <!--LED section info-->
+          <h3>LED controller</h3>
+          <div id='LedContainer' style='min-width: 310px; height: 350px; margin: 0 auto'></div>
+          <br/>
+          <div class='col-md-10' style='margin: 0 auto'>
+            <table class='table table-striped' id='LedTable'>
+              <caption>
+                <div class='row'>
+                  <div class='col-md-9'>
+                  <i>Daytime LED-controller's value</i>
+                </div>
+                  <div class='col-md-3'>
+                   <form action='/' method='POST'>
+                    <button type='button' class='btn btn-success btn-sm' data-toggle='modal' data-target='#CreateLedModal'>Add</button>
+                    <button type='submit' name='clearTimeTable' class='btn btn-danger btn-sm'>Remove ALL</button>
+                  </div>
+                 </form>
+                </div>
+              </caption>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Chanel 1 (dig unit)</th>
+                  <th>Chanel 2 (dig unit)</th>
+                  <th>Chanel 3 (dig unit)</th>
+                  <th>Chanel 4 (dig unit)</th>
+                </tr>
+              </thead>
+              <tbody>
+  page +=                WriteLedTable();
+              </tbody>
+            </table>
+          </div>
+          <!--END of LED section info-->
+          <h3>Additional board interface</h3>
+          <div class='row'>
+            <div class='col-md-4'>
+              <h3>GPIO</h3>
+              <div class='row'>
+                <div class='col-md-4'>
+                  <h5 class='text-left'>
+                    D5  <span class='badge badge-pill badge-
+  page +=                   (sensors[GD5].value == 1) ? "primary" : "dark
+                   '>Light</span>
+                  </h5>
+                </div>
+                <div class='col-md-4'>
+                  <form action='/' method='POST'>
+                    <button type='button submit' name='GD5' value='1' class='btn btn-success'>ON</button>
+                  </form>
+                </div>
+                <div class='col-md-4'>
+                  <form action='/' method='POST'>
+                    <button type='button submit' name='GD5' value='0' class='btn btn-danger'>OFF</button>
+                  </form>
+                </div>
+                <div class='col-md-4'>
+                  <h5 class='text-left'>
+                    D7  <span class='badge badge-pill  badge-warning'><i>title</i></span>
+                  </h5>
+                </div>
+                <div class='col-md-8'>
+                <form action='/' method='POST'>
+                 <div class='row'>
+                    <div class='col-md-5'>
+                      <input type='time' class='form-control' name='GD7timeStart' value='" + GD7TimeTable.startTime + "' placeholder='20:30'>
+                    </div>
+                    <div class='col-md-2'>
+                      <p> -> </p>
+                    </div>
+                    <div class='col-md-5'>
+                       <input type='time' class='form-control' name='GD7timeEnd' value='" + GD7TimeTable.finishTime + "' placeholder='20:30'>
+                     </div>
+                 </div>
+                 <button type='submit' class='btn btn-info btn-sm btn-block'>SEND</button>
+               </form>
+              </div>
+                <div class='col-md-4'>
+                  <h5 class='text-left'>
+                    D8  <span class='badge badge-pill  badge-warning'><i>title</i></span>
+                  </h5>
+                </div>
+                <div class='col-md-4'>
+                    <input id='GD8ex' data-slider-id='ex1Slider' type='button submit' data-slider-min='0' data-slider-max='1023' data-slider-step='1' style='width:100px' data-slider-value='
+  page +=                     sensors[GD8].value;
+                     ' />
+                    <span id='ex6CurrentSliderValLabel'>Value: <span id='GD8exVal'>
+  page +=                       sensors[GD8].value;
+                     </span></span>
+                </div>
+                <div class='col-md-4'>
+                  <form action='/' method='POST'>
+                    <button id='GD8Button' type='button submit' name='GD8' value='0' class='btn btn-info btn-sm'>SEND</button>
+                  </form>
+                </div>
+              </div>
+            </div>
+  
+          <!--End of GPIO section -->
+  
+          <!-- Console section -->
+          <div class='col-md-8' style='height: 250px; overflow-y: scroll'>
+            <nav id='console-bar' class='navbar sticky-top navbar-light bg-light sticky'>
+             <a class='navbar-brand' data-toggle='collapse' href='#multiCollapseExample1' role='button' aria-expanded='false' aria-controls='multiCollapseExample1'>Show console log</a>
+            </nav>
+            <div class='collapse multi-collapse' id='multiCollapseExample1' style='margin: 10px'>
+              <div data-spy='scroll' data-target='#navbar-example2' data-offset='0'>
+  page += logString;
+              </div>
+            </div>
+          </div>
+        </div>
+        </br>
+        </div>
+      </div>
+    </div>
+    </div>
+    <div class='modal fade' id='CreateLedModal' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>
+    <div class='modal-dialog' role='document'>
+      <div class='modal-content'>
+        <div class='modal-header'>
+          <h4 class='modal-title'>New event of LED controller</h4>
+          <button type='button' class='close' data-dismiss='modal' aria-label='Close'>
+            <span aria-hidden='true'>&times;</span>
+          </button>
+        </div>
+        <div class='modal-body'>
+          <form action='/' method='POST'>
+            <div class='form-group row'>
+              <label for='colFormLabel' class='col-sm-2 col-form-label'>Time</label>
+              <div class='col-sm-10'>
+                <input type='time' min='0' max='1023' class='form-control' name='LEDtime' placeholder='20:30'>
+              </div>
+            </div>
+            <div class='form-group row'>
+              <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 1</label>
+              <div class='col-sm-10'>
+                <input type='number' min='0' max='1023' class='form-control' name='LEDchanel1' placeholder='0'>
+              </div>
+            </div>
+            <div class='form-group row'>
+              <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 2</label>
+              <div class='col-sm-10'>
+                <input type='number' min='0' max='1023' class='form-control' name='LEDchanel2' placeholder='255'>
+              </div>
+            </div>
+            <div class='form-group row'>
+              <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 3</label>
+              <div class='col-sm-10'>
+                <input type='number' min='0' max='1023' class='form-control' name='LEDchanel3' placeholder='0'>
+              </div>
+            </div>
+            <div class='form-group row'>
+              <label for='colFormLabel' class='col-sm-2 col-form-label'>Chanel 4</label>
+              <div class='col-sm-10'>
+                <input type='number' class='form-control' name='LEDchanel4' placeholder='255'>
+              </div>
+            </div>
+            <div class='modal-footer'>
+              <button type='reset' class='btn btn-secondary'>Reset</button>
+              <button type='submit' class='btn btn-primary'>Save</button>
+           </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+    <script type='text/javascript'>
+      Highcharts.chart('LedContainer', {
+        data: {
+          table: 'LedTable'
+        },
+        chart: {
+          type: 'line'
+        },
+        title: {
+          text: 'Daytime term'
+        },
+        yAxis: {
+          allowDecimals: true,
+          title: {
+            text: 'Value of unit'
+          }
+        },
+        tooltip: {
+          formatter: function () {
+            return '<b>' + this.series.name + '</b><br/>' +
+            'время:' + this.point.name.toLowerCase() + '<br/>' + this.point.y;
+          }
+        }
+      });
+    </script>
+    <script type='text/javascript'>
+        $(document).ready(function () {
+            $('#GD8ex').slider({
+                formatter: function (value) {
+                    return 'Current value: ' + value;
+                },
+                tooltip: 'always'
+            });
+            $('#GD8ex').on('slide', function(slideEvt) {
+             $('#GD8exVal').text(slideEvt.value);
+              $('#GD8Button').attr('value', slideEvt.value);
+            });
+        });
+    </script>
+  </body>
+</html>
