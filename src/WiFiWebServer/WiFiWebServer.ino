@@ -39,7 +39,7 @@ String readString = String(128);
 String logString = "";
 
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
-enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD7, GD8};
+enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD6, GD7, GD8};
 
 const char* ssid = "WiFi-DOM.ru-2463"; 
 const char* password = "89502657277"; 
@@ -53,11 +53,6 @@ typedef struct {
   String startTime;
   String finishTime;
 } TimeExecution;
-
-typedef struct {
-  Time startTime();
-  Time finishTime();
-} TimeExec;
 
 typedef struct {
   sensor_name sensorName;
@@ -75,13 +70,14 @@ typedef struct {
 } LedSchedule;
 
 State sensors[8] = {
-   {LED_1, 0, D5, true},
-   {LED_2, 0, D6, true},
-   {LED_3, 0, D7, true},
-   {LED_4, 0, D8, true},
-   {GD5, 0, D4, false},
-   {GD7, 0, 9, false},
-   {GD8, 0, 10, true}
+   {LED_1, 0, D0, true}, 
+   {LED_2, 0, D1, true}, 
+   {LED_3, 0, D2, true}, 
+   {LED_4, 0, D4, true}, 
+   {GD5, 0, D5, false}, 
+   {GD6, 0, D6, false}, 
+   {GD7, 0, D7, false}, 
+   {GD8, 0, D8, true}
 };
 
 TimeExecution GD7TimeTable;
@@ -94,8 +90,8 @@ void setup() {
   Serial.println("start configuring");
 
   InitializeLeds();
-
   delay(10);
+  
   ConfigureClock();
   ConfigureGpio();
   ConfigureWiFi();
@@ -105,7 +101,7 @@ void loop() {
   ApplyCurrentState();
   delay(1);
   // Send the response to the client
-  getPostRequest();
+  GetPostRequest();
   delay(1);
   DoSchedule();
 }
@@ -128,7 +124,7 @@ void LOG(String text, logs_state status){
    String color[4] = {"black", "green", "yellow", "red"};
   logString += "<p style='color:" + color[status] +"' >"  + "[" + GetCurrentTime()+ "]: " + text + "</p>";
 
-  Serial.println("LOG :[" + GetCurrentTime() + "]: " + text);
+  Serial.println("LOG:[" + GetCurrentTime() + "]: " + text);
 }
 
 int Compare(LedSchedule& a, LedSchedule& b) {
@@ -214,7 +210,7 @@ void InitializeLeds(){
   timetable->add({"09:00", 200, 200, 200, 200}); 
 }
 
-void getPostRequest() {
+void GetPostRequest() {
   WiFiClient client = server.available();
   
   if (client) {
@@ -312,7 +308,7 @@ int TimeToMinutes(String incomingTime){
   }
   
   return (hours * 60) + minutes;
- }
+}
 
 void PerformRequestedCommands() {
   readString = buffer;
@@ -326,7 +322,7 @@ void PerformRequestedCommands() {
     int value = GetValueFromHtmlForm("GD8", readString).toInt();
     UpdatePinValue(GD8, value);
   }else if(readString.indexOf("GD7") != -1) {
-    saveGD7TimeSchedule(readString);
+    SaveGD7TimeSchedule(readString);
   }else if(readString.indexOf("SystemTime") != -1) {
     SetupTime(readString);
   }else if(readString.indexOf("clearAll") != -1) {
@@ -361,8 +357,7 @@ void PerformNewLedEvent(String requestBody) {
     + " ch1: " + chanel1
     + " ch2: " + chanel2
     + " ch3: " + chanel3
-    + " ch4: " + chanel4
-    , SUCCESS);
+    + " ch4: " + chanel4, SUCCESS);
 }
 
 String ParseTime(String requestBody, String patternStart, String patternEnd){
@@ -372,7 +367,7 @@ String ParseTime(String requestBody, String patternStart, String patternEnd){
   return parsedTime;
 }
 
-void saveGD7TimeSchedule(String requestBody){
+void SaveGD7TimeSchedule(String requestBody){
   String startTime = GetValueFromHtmlForm("timeStart", requestBody);
   startTime = startTime.substring(0, startTime.indexOf("&GD7timeEnd"));
   String endTime = GetValueFromHtmlForm("timeEnd", requestBody);
@@ -381,7 +376,10 @@ void saveGD7TimeSchedule(String requestBody){
   endTime.replace("%3A", ":");
   GD7TimeTable = {startTime, endTime}; 
 
-  LOG("Added new event for timeDepends GPIO. Time of execution " + startTime + " - " + endTime, SUCCESS);
+  LOG("Added new event for timeDepends GPIO. Time of execution "
+  + startTime
+  + " - "
+  + endTime, SUCCESS);
 }
 
 void SetupTime(String requestBody){
@@ -397,8 +395,7 @@ void SetupTime(String requestBody){
   LOG("Received time params Hours: "
         + String(hoursNumber)
         + ", Minutes: "
-        + String(minNumber)
-      , SUCCESS);
+        + String(minNumber), SUCCESS);
   rtc.adjust(DateTime(2018, 7, 21, hoursNumber, minNumber, 0));
   LOG("Time was reconfigured", NORMAL);
   CheckSystemTime();
@@ -440,9 +437,14 @@ void DoSchedule(){
   int leng = timetable->size();
   for(int i = 0; i < leng - 1; i++){
     if ((String(timetable->get(i).timeExecute) <= String(currentTime)) && (String(currentTime) < String(timetable->get(i+1).timeExecute))) {
-      Serial.print("current " + currentTime);
-      Serial.print("timeTableSatrt " + timetable->get(i).timeExecute);
-      Serial.println("timeTableEnd " + timetable->get(i+1).timeExecute);
+      Serial.println("execute Event ["
+                    + String(i)
+                    + "] time: "
+                    + currentTime
+                    + " event is beeing executed from "
+                    + timetable->get(i).timeExecute
+                    + " to "
+                    + timetable->get(i+1).timeExecute);
       AssignCurrentLedValueFromTimeTable(i);
     }
   }
@@ -460,16 +462,6 @@ void DoSchedule(){
     UpdatePinValue(GD7, 0);
   }
 }
-
-/*void DoScheduleGD7(){
-  Time t = rtc.time();
-  if (((GD7Start.hr >= t.hr) && (GD7Finish.min >= t.min)) && ((GD7Finish.hr <= t.hr) && (GD7Finish.min <= t.min)))
-  {
-    sensors[GD7].value = 1;
-  }else{
-    sensors[GD7].value = 0;
-  }
-}*/
 
 String GetPage(){
   String page = "";
@@ -599,6 +591,19 @@ String GetPage(){
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
+  page += "                <h5 class='text-left'>";
+  page += "                  D6  <span class='badge badge-pill badge-"; 
+  page +=                   (sensors[GD6].value == 1) ? "primary" : "dark"; 
+  page += "                 '>Coller</span>"; 
+  page += "                </h5>"; 
+  page += "              </div>"; 
+  page += "              <div class='col-md-4'>"; 
+  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='1' class='btn btn-success'>ON</button></form>"; 
+  page += "              </div>"; 
+  page += "              <div class='col-md-4'>"; 
+  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='0' class='btn btn-danger'>OFF</button></form>"; 
+  page += "              </div>"; 
+  page += "              <div class='col-md-4'>"; 
   page += "                <h5 class='text-left'>";
   page += "                  D7  <span class='badge badge-pill  badge-warning'><i>title</i></span>";
   page += "                </h5>";
