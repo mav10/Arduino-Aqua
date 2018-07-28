@@ -9,7 +9,7 @@
  *   - 4 LED controller:
  *   - - Time schedule execution for every channel
  *   - - - P.S. this pins assigned as PWM.
- *  - GPIO 5, GPIO 6:
+ *  - GPIO 5:
  *  - - You can only swith on/off devices which connected to this pins
  *  - GPIO 7:
  *  - - This is also swith on/off function, but it works only during the configured time
@@ -21,12 +21,15 @@
  *  printed to Serial when the module is connected.
  *  
  *  Sorting was downloaded here https://github.com/ivanseidel/LinkedList
+ *  DS1302 waas downloaded here https://github.com/msparks/arduino-ds1302
  *  Rtc lib could be downloaded via Arduino MarketPlace "RTClib by Adafruit"
  *  
  *  Actualy, all libs there are in folder and you can include them via library manager (.zip setupper)
+ *  This scetch uses and is configured to RTC DS1302. So we use liblary for that module. And also configured pins out for rela time clock
 */
 #include <LinkedList.h>
 #include <Wire.h>
+#include <DS1302.h>
 #include <RTClib.h>
 #include <ESP8266WiFi.h>
 #include <String.h>
@@ -39,20 +42,35 @@ String readString = String(128);
 String logString = "";
 
 enum logs_state {NORMAL, SUCCESS, WARNING, DANGER};
-enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD6, GD7, GD8};
+enum sensor_name {LED_1, LED_2, LED_3, LED_4, GD5, GD7, GD8};
 
 const char* ssid = "WiFi-DOM.ru-2463"; 
 const char* password = "89502657277"; 
 
+/*
+ * Set the appropriate digital I/O pin connections. These are the pin
+ * assignments for the Arduino as well for as the DS1302 chip. See the DS1302
+ * datasheet:  http://datasheets.maximintegrated.com/en/ds/DS1302.pdf
+*/
+const int kCePin   = D0;  // Chip Enable
+const int kIoPin   = D1;  // Input/Output
+const int kSclkPin = D2;  // Serial Clock
+
+DS1302 rtc(kCePin, kIoPin, kSclkPin);
+
 // Create an instance of the server
 // specify the port to listen on as an argument
 WiFiServer server(80);
-RTC_DS3231 rtc;
 
 typedef struct {
   String startTime;
   String finishTime;
 } TimeExecution;
+
+typedef struct {
+  Time startTime();
+  Time finishTime();
+} TimeExec;
 
 typedef struct {
   sensor_name sensorName;
@@ -70,14 +88,13 @@ typedef struct {
 } LedSchedule;
 
 State sensors[8] = {
-   {LED_1, 0, D0, true}, 
-   {LED_2, 0, D1, true}, 
-   {LED_3, 0, D2, true}, 
-   {LED_4, 0, D4, true}, 
-   {GD5, 0, D5, false}, 
-   {GD6, 0, D6, false}, 
-   {GD7, 0, D7, false}, 
-   {GD8, 0, D8, true}
+   {LED_1, 0, D5, true},
+   {LED_2, 0, D6, true},
+   {LED_3, 0, D7, true},
+   {LED_4, 0, D8, true},
+   {GD5, 0, D4, false},
+   {GD7, 0, 9, false},
+   {GD8, 0, 10, true}
 };
 
 TimeExecution GD7TimeTable;
@@ -101,23 +118,19 @@ void loop() {
   ApplyCurrentState();
   delay(1);
   // Send the response to the client
-  GetPostRequest();
+  getPostRequest();
   delay(1);
   DoSchedule();
 }
 
 String GetCurrentTime(){
-  DateTime nowtime = rtc.now();
+   // Get the current time and date from the chip.
+  Time t = rtc.time();
   String parsedMin = String();
-
-  //TODO: little hack for displaying 00:01
-  if(nowtime.minute() < 10 && (String(nowtime.minute(), DEC).length() < 2)){
-    parsedMin = String(0) + String(nowtime.minute(), DEC);
-  }
-  else{
-    parsedMin = String(nowtime.minute(), DEC);
-  }
-  return String(nowtime.hour(), DEC) + ":" + parsedMin;
+  String parsedHour = String();
+  parsedHour = (t.hr < 10) ? "0" + String(t.hr, DEC) : String(t.hr, DEC);
+  parsedMin = (t.min < 10) ? "0" + String(t.min, DEC) : String(t.min, DEC);
+  return parsedHour + ":" + parsedMin;
 }
 
 void LOG(String text, logs_state status){
@@ -134,40 +147,41 @@ int Compare(LedSchedule& a, LedSchedule& b) {
   return -1;
 }
 
-void ConfigureClock() {
-  if (! rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-    while(1);
-  }
+void ConfigureClock(){
+  // Initialize a new chip by turning off write protection and clearing the
+  // clock halt flag. These methods needn't always be called. See the DS1302
+  // datasheet for details.
+  rtc.writeProtect(false);
+  rtc.halt(false);
 
-  if (rtc.lostPower()) {
-    Serial.println("RTC lost power, lets set the time!");
-    // following line sets the RTC to the date & time this sketch was compiled
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // July 20, 2018 at 22:20 you would call:
-    //rtc.adjust(DateTime(2018, 7, 20, 22, 20, 0));
-  }
+  // Make a new time object to set the date and time.
+  // Sunday, July 21, 2018 at 22:59:00.
+  Time t(2018, 7, 21, 22, 59, 0, Time::kSunday);
+
+  // Set the time and date on the chip.
+  rtc.time(t);
   CheckSystemTime();
 }
 
 void CheckSystemTime(){
-  DateTime nowTime = rtc.now();
-  
+  Time t = rtc.time();
+  String day = dayAsString(t.day);
   LOG("Chech the time after configuring", WARNING);  
  
   LOG("system time: "
-    + String(nowTime.year(), DEC)
+    + String(day.c_str())
     + "/"
-    + String(nowTime.month(), DEC)
+    + String(t.yr, DEC)
     + "/"
-    + String(nowTime.day(), DEC)
+    + String(t.mon, DEC)
+    + "/"
+    + String(t.date, DEC)
     + " "
-    + String(nowTime.hour(), DEC)
+    + String(t.hr, DEC)
     + ":"
-    + String(nowTime.minute(), DEC)
+    + String(t.min, DEC)
     + ":"
-    + String(nowTime.second(), DEC)
+    + String(t.sec)
     , NORMAL);
   LOG("programm time: " + GetCurrentTime(), NORMAL);
 
@@ -177,6 +191,19 @@ void CheckSystemTime(){
         + " Check the RTC module"
        , DANGER);
   }
+}
+
+String dayAsString(const Time::Day day) {
+  switch (day) {
+    case Time::kSunday: return "Sunday";
+    case Time::kMonday: return "Monday";
+    case Time::kTuesday: return "Tuesday";
+    case Time::kWednesday: return "Wednesday";
+    case Time::kThursday: return "Thursday";
+    case Time::kFriday: return "Friday";
+    case Time::kSaturday: return "Saturday";
+  }
+  return "(unknown day)";
 }
 
 void ConfigureWiFi(){
@@ -210,7 +237,7 @@ void InitializeLeds(){
   timetable->add({"09:00", 200, 200, 200, 200}); 
 }
 
-void GetPostRequest() {
+void getPostRequest() {
   WiFiClient client = server.available();
   
   if (client) {
@@ -315,9 +342,6 @@ void PerformRequestedCommands() {
   if(readString.indexOf("GD5") != -1) { 
     int value = GetValueFromHtmlForm("GD5", readString).toInt();
     UpdatePinValue(GD5, value);              
-  } else if(readString.indexOf("GD6") != -1) {
-    int value = GetValueFromHtmlForm("GD6", readString).toInt();
-    UpdatePinValue(GD6, value);
   } else if(readString.indexOf("GD8") != -1) {
     int value = GetValueFromHtmlForm("GD8", readString).toInt();
     UpdatePinValue(GD8, value);
@@ -362,8 +386,7 @@ void PerformNewLedEvent(String requestBody) {
 
 String ParseTime(String requestBody, String patternStart, String patternEnd){
   String parsedTime = GetValueFromHtmlForm(patternStart, requestBody);
-  
-  if(patternEnd != "") 
+  if(patternEnd != "")
     parsedTime = parsedTime.substring(0, parsedTime.indexOf(patternEnd));
   
   parsedTime.replace("%3A", ":");
@@ -377,7 +400,7 @@ void SaveGD7TimeSchedule(String requestBody){
 
   startTime.replace("%3A", ":");
   endTime.replace("%3A", ":");
-  GD7TimeTable = {startTime, endTime}; 
+  GD7TimeTable = {startTime, endTime};
 
   LOG("Added new event for timeDepends GPIO. Time of execution "
   + startTime
@@ -386,7 +409,9 @@ void SaveGD7TimeSchedule(String requestBody){
 }
 
 void SetupTime(String requestBody){
-  String newTime = ParseTime(requestBody, "SystemTime", "");
+  String newTime = ParseTime(requestBody, "SystemTime", String());
+   LOG("time parser: "
+        + newTime, NORMAL);
   newTime.replace("%3A", ":");
   int index = newTime.indexOf(":");
   int hoursNumber =  newTime.substring(0, index).toInt();
@@ -399,14 +424,19 @@ void SetupTime(String requestBody){
         + String(hoursNumber)
         + ", Minutes: "
         + String(minNumber), SUCCESS);
-  rtc.adjust(DateTime(2018, 7, 21, hoursNumber, minNumber, 0));
+
+  // Sunday, July 21, 2013 at HH:mm:00.
+  Time t(2018, 7, 21, hoursNumber, minNumber, 0, Time::kSunday);
+  rtc.time(t);
+
   LOG("Time was reconfigured", NORMAL);
   CheckSystemTime();
 }
 
+
 String GetValueFromHtmlForm(String gpioName, String requestBody){
   int startIndex = requestBody.indexOf(gpioName + "=");
-  return requestBody.substring(startIndex + gpioName.length() + 1);
+    return requestBody.substring(startIndex + gpioName.length() + 1);
 }
 
 String WriteLedTable(){
@@ -475,16 +505,16 @@ void DoSchedule(){
   }
   if ((String(currentTime) > String(timetable->get(leng -1).timeExecute)) && (String(timetable->get(0).timeExecute) >= String(currentTime))){
     //TODO: we have to repeat loop again
-    AssignCurrentLedValueFromTimeTable(leng -1);
+     AssignCurrentLedValueFromTimeTable(leng -1);
   }
 
-  bool moreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
-  bool lessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
-  if (moreThenStart && lessThenFinish)
+  bool MoreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
+  bool LessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
+  if (MoreThenStart && LessThenFinish)
   {
-    UpdatePinValue(GD7, 1);
+    sensors[GD7].value = 1;
   }else{
-    UpdatePinValue(GD7, 0);
+    sensors[GD7].value = 0;
   }
 }
 
@@ -543,13 +573,13 @@ String GetPage(){
   page += "          <div class='col-md-4'>";
   page += "            <div class='card text-white bg-info mb-3'>";
   page += "              <div class='card-header'>Arduino info</div>";
-  page += "<div class='card-body'>";
-  page += "                  <h3 class='card-title'>Connection: ON</h3>";
-  page += "                    <form action='/' method='POST' style='margin:0px'>";
-  page += "                       <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
-  page += "                       <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>";
+  page += "              <div class='card-body'>";
+  page += "                <h3 class='card-title'>Connection: ON</h3>";
+  page += "                   <form action='/' method='POST' style='margin:0px'>";
+  page += "                     <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
+  page += "                     <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>";
   page += "                   </form>";
-  page += "                </div>";
+  page += "              </div>";
   page += "        <div class='card-footer'>";
   page += "         <small>Work duration:";
   page +=             GetCurrentTime();
@@ -616,19 +646,6 @@ String GetPage(){
   page += "                </form>";
   page += "              </div>";
   page += "              <div class='col-md-4'>";
-  page += "                <h5 class='text-left'>";
-  page += "                  D6  <span class='badge badge-pill badge-"; 
-  page +=                   (sensors[GD6].value == 1) ? "primary" : "dark"; 
-  page += "                 '>Coller</span>"; 
-  page += "                </h5>"; 
-  page += "              </div>"; 
-  page += "              <div class='col-md-4'>"; 
-  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='1' class='btn btn-success'>ON</button></form>"; 
-  page += "              </div>"; 
-  page += "              <div class='col-md-4'>"; 
-  page += "                <form action='/' method='POST'><button type='button submit' name='GD6' value='0' class='btn btn-danger'>OFF</button></form>"; 
-  page += "              </div>"; 
-  page += "              <div class='col-md-4'>"; 
   page += "                <h5 class='text-left'>";
   page += "                  D7  <span class='badge badge-pill  badge-warning'><i>title</i></span>";
   page += "                </h5>";
@@ -740,7 +757,7 @@ String GetPage(){
   page += "  </div>";
   page += "</div>";
   page += "";
-  page += "<div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>";
+  page += "  <div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>";
   page += "    <div class='modal-dialog' role='document'>";
   page += "      <div class='modal-content'>";
   page += "        <div class='modal-header'>";

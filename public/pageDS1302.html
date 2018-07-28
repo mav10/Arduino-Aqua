@@ -1,4 +1,4 @@
- <html charset=UTF-8>
+<html charset=UTF-8>
   <head>
     <meta http-equiv='Content-Type' content='text/html, charset=utf-8'/> 
     <meta name='viewport' content='width=device-width, initial-scale=0.8'>
@@ -50,16 +50,16 @@
             <div class='col-md-4'>
               <div class='card text-white bg-info mb-3'>
                 <div class='card-header'>Arduino info</div>
-  <div class='card-body'>
-                    <h3 class='card-title'>Connection: ON</h3>
-                      <form action='/' method='POST' style='margin:0px'>
+                <div class='card-body'>
+                  <h3 class='card-title'>Connection: ON</h3>
+                   <form action='/' method='POST' style='margin:0px'>
                          <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>
                          <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>
-                     </form>
-                  </div>
+                   </form>
+                </div>
           <div class='card-footer'>
            <small>Work duration:
-  page +=             GetCurrentTime();
+  page +=             getCurrentTime();
            </small>
            </div>
               </div>
@@ -108,7 +108,7 @@
                 <div class='col-md-4'>
                   <h5 class='text-left'>
                     D5  <span class='badge badge-pill badge-
-                     (sensors[GD5].value == 1) ? "primary" : "dark
+  page +=                   (sensors[GD5].value == 1) ? "primary" : "dark
                    '>Light</span>
                   </h5>
                 </div>
@@ -121,19 +121,6 @@
                   <form action='/' method='POST'>
                     <button type='button submit' name='GD5' value='0' class='btn btn-danger'>OFF</button>
                   </form>
-                </div>
-                <div class='col-md-4'>
-                  <h5 class='text-left'>
-                    D6  <span class='badge badge-pill badge-
-						(sensors[GD6].value == 1) ? "primary" : "dark
-                   '>Coller</span>
-                  </h5>
-                </div>
-                <div class='col-md-4'>
-                  <form action='/' method='POST'><button type='button submit' name='GD6' value='1' class='btn btn-success'>ON</button></form>
-                </div>
-                <div class='col-md-4'>
-                  <form action='/' method='POST'><button type='button submit' name='GD6' value='0' class='btn btn-danger'>OFF</button></form>
                 </div>
                 <div class='col-md-4'>
                   <h5 class='text-left'>
@@ -162,9 +149,8 @@
                   </h5>
                 </div>
                 <div class='col-md-4'>
-					<!--Add to data-slider-value sensors[GD8].value in arduino CODE-->
                     <input id='GD8ex' data-slider-id='ex1Slider' type='button submit' data-slider-min='0' data-slider-max='1023' data-slider-step='1' style='width:100px' data-slider-value='
-                       0
+  page +=                     sensors[GD8].value;
                      ' />
                     <span id='ex6CurrentSliderValLabel'>Value: <span id='GD8exVal'>
   page +=                       sensors[GD8].value;
@@ -248,7 +234,7 @@
     </div>
   </div>
   
-  <div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>
+    <div class='modal fade' id='SetupTime' tabindex='-1' role='dialog' aria-labelledby='myModalLabel' aria-hidden='true'>
     <div class='modal-dialog' role='document'>
       <div class='modal-content'>
         <div class='modal-header'>
@@ -275,6 +261,7 @@
       </div>
     </div>
   </div>
+  
     <script type='text/javascript'>
       Highcharts.chart('LedContainer', {
         data: {
@@ -315,4 +302,4 @@
         });
     </script>
   </body>
- </html>
+</html>
