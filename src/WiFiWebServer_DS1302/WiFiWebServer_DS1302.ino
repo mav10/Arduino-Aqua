@@ -386,7 +386,9 @@ void PerformNewLedEvent(String requestBody) {
 
 String ParseTime(String requestBody, String patternStart, String patternEnd){
   String parsedTime = GetValueFromHtmlForm(patternStart, requestBody);
-  parsedTime = parsedTime.substring(0, parsedTime.indexOf(patternEnd));
+  if(patternEnd != "")
+    parsedTime = parsedTime.substring(0, parsedTime.indexOf(patternEnd));
+  
   parsedTime.replace("%3A", ":");
   return parsedTime;
 }
@@ -438,9 +440,14 @@ String GetValueFromHtmlForm(String gpioName, String requestBody){
 }
 
 String WriteLedTable(){
+  String currentTime = GetCurrentTime();
   timetable->sort(Compare);
+  int leng = timetable->size();
   String row = "";
-  for(int i = 0; i < timetable->size(); i++) {
+  for(int i = 0; i < leng - 1; i++) {
+    if ((String(timetable->get(i).timeExecute) <= String(currentTime)) && (String(currentTime) < String(timetable->get(i+1).timeExecute)))
+      row += "              <tr style='color:green font-style:italic'>";
+    else
       row += "              <tr>";
       row += "                <td>";
       row +=                    timetable->get(i).timeExecute;
@@ -459,6 +466,23 @@ String WriteLedTable(){
       row +=                  "</td>";
       row += "              </tr>";
   }
+      row += "              <tr>";
+      row += "                <td>";
+      row +=                    timetable->get(leng - 1).timeExecute;
+      row +=                  "</td>";
+      row += "                <td>";
+      row +=                    timetable->get(leng - 1).channel1;
+      row +=                  "</td>";
+      row += "                <td>";
+      row +=                    timetable->get(leng - 1).channel2;
+      row +=                  "</td>";
+      row += "                <td>";
+      row +=                    timetable->get(leng - 1).channel3;
+      row +=                  "</td>";
+      row += "                <td>";
+      row +=                    timetable->get(leng - 1).channel4;
+      row +=                  "</td>";
+      row += "              </tr>";
   return row;
 }
 
