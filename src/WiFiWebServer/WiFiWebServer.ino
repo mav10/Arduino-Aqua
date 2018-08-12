@@ -480,26 +480,44 @@ void DoSchedule(){
     AssignCurrentLedValueFromTimeTable(leng -1);
   }
 
-  bool moreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
-  bool lessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
-  if (moreThenStart && lessThenFinish)
-  {
-    UpdatePinValue(GD7, 1);
-  }else{
-    UpdatePinValue(GD7, 0);
-  }
-  
+  ExecuteGD7(currentTime);
   ScheduleCleanUp(currentTime);
 }
 
+void ExecuteGD7(String currentTime){
+  bool startTimeLessThenFinish = (String(GD7TimeTable.startTime) < String(GD7TimeTable.finishTime));
+  if(startTimeLessThenFinish){
+    //TODO: if we have common case when startTime < endTime 10:00 -> 12:00
+    bool MoreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
+    bool LessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
+    if (MoreThenStart && LessThenFinish)
+    {
+      sensors[GD7].value = 1;
+    }else{
+      sensors[GD7].value = 0;
+    }
+  }
+  else {
+    //TODO: other case: when startTime > endTime  e.g. 19:00 -> 06:00
+    bool MoreThenStart = (String(GD7TimeTable.startTime) <= String(currentTime));
+    bool LessThenFinish = (String(GD7TimeTable.finishTime) >= String(currentTime));
+    if (MoreThenStart || LessThenFinish)
+    {
+      sensors[GD7].value = 1;
+    }else{
+      sensors[GD7].value = 0;
+    }
+  }
+}
+
 void ScheduleCleanUp(String currentTime){ 
-  if(currentTime == "07:00" 
-    || currentTime == "15:00" 
-    || currentTime == "00:00") 
-    { 
-      ClearCache(); 
-      LOG("CleanUp has just been executed", NORMAL); 
-    } 
+  int separatorIndex = currentTime.indexOf(":");
+  int minutes = currentTime.substring(separatorIndex + 1).toInt();
+  if(minutes == 0)
+    {
+      ClearCache();
+      LOG("CleanUp has just been executed", NORMAL);
+    }
 } 
 
 String GetPage(){
