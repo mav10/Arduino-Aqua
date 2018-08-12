@@ -109,15 +109,17 @@ void loop() {
 String GetCurrentTime(){
   DateTime nowtime = rtc.now();
   String parsedMin = String();
-
+  String parsedHour = String();
+  
   //TODO: little hack for displaying 00:01
-  if(nowtime.minute() < 10 && (String(nowtime.minute(), DEC).length() < 2)){
-    parsedMin = String(0) + String(nowtime.minute(), DEC);
-  }
-  else{
-    parsedMin = String(nowtime.minute(), DEC);
-  }
-  return String(nowtime.hour(), DEC) + ":" + parsedMin;
+  parsedMin = (nowtime.minute() < 10 && (String(nowtime.minute(), DEC).length() < 2))
+      ?  String(0) + String(nowtime.minute(), DEC)
+      :  String(nowtime.minute(), DEC);
+  parsedHour = (nowtime.hour() < 10 && (String(nowtime.hour(), DEC).length() < 2))
+      ? String(0) + String(nowtime.hour(), DEC)
+      :  String(nowtime.hour(), DEC);
+  
+  return parsedHour + ":" + parsedMin;
 }
 
 void LOG(String text, logs_state status){
@@ -416,7 +418,7 @@ String WriteLedTable(){
   String row = "";
   for(int i = 0; i < leng - 1; i++) {
     if ((String(timetable->get(i).timeExecute) <= String(currentTime)) && (String(currentTime) < String(timetable->get(i+1).timeExecute)))
-      row += "              <tr style='color:green font-style:italic'>";
+      row += "              <tr style='color:green; font-style:italic'>";
     else
       row += "              <tr>";
       row += "                <td>";
@@ -486,7 +488,19 @@ void DoSchedule(){
   }else{
     UpdatePinValue(GD7, 0);
   }
+  
+  ScheduleCleanUp(currentTime);
 }
+
+void ScheduleCleanUp(String currentTime){ 
+  if(currentTime == "07:00" 
+    || currentTime == "15:00" 
+    || currentTime == "00:00") 
+    { 
+      ClearCache(); 
+      LOG("CleanUp has just been executed", NORMAL); 
+    } 
+} 
 
 String GetPage(){
   String page = "";
