@@ -30,7 +30,6 @@
 #include <LinkedList.h>
 #include <Wire.h>
 #include <DS1302.h>
-#include <RTClib.h>
 #include <ESP8266WiFi.h>
 #include <String.h>
 
@@ -361,10 +360,35 @@ void PerformRequestedCommands() {
 }
 
 void ClearCache() {
+  Serial.println("----Before------");
+  Serial.print("ESP.getCpuFreqMHz(); ");
+  Serial.println(ESP.getCpuFreqMHz());
+  Serial.print("ESP.getVcc(); ");
+  Serial.println(ESP.getVcc());
+  Serial.print("ESP.getSketchSize(); ");
+  Serial.println(ESP.getSketchSize());
+  Serial.print("ESP.getFreeSketchSpace(); ");
+  Serial.println(ESP.getFreeSketchSpace());
+  Serial.print("ESP.getFreeheap();");
+  Serial.println(ESP.getFreeHeap()); 
+  Serial.println("---Before------");
   post = ' ';
   logString = "";
   readString = "";
   memset(buffer, 0, sizeof(buffer)/sizeof(char));
+
+  Serial.println("----After------");
+  Serial.print("ESP.getCpuFreqMHz(); ");
+  Serial.println(ESP.getCpuFreqMHz());
+  Serial.print("ESP.getVcc(); ");
+  Serial.println(ESP.getVcc());
+  Serial.print("ESP.getSketchSize(); ");
+  Serial.println(ESP.getSketchSize());
+  Serial.print("ESP.getFreeSketchSpace(); ");
+  Serial.println(ESP.getFreeSketchSpace());
+  Serial.print("ESP.getFreeheap();");
+  Serial.println(ESP.getFreeHeap()); 
+  Serial.println("----After-------");
 }
 
 void PerformNewLedEvent(String requestBody) {
@@ -391,6 +415,12 @@ String ParseTime(String requestBody, String patternStart, String patternEnd){
   
   parsedTime.replace("%3A", ":");
   return parsedTime;
+}
+int MemoryUsageInPercent(){
+  int totalSize = 32200;
+  int usedBytes = totalSize - ESP.getFreeHeap();
+  return (usedBytes*100/totalSize);
+  
 }
 
 void SaveGD7TimeSchedule(String requestBody){
@@ -567,6 +597,14 @@ String GetPage(){
   page += "  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/css/bootstrap-slider.min.css' />";
   page += "  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/css/bootstrap-slider.css' />";
   page += "  <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>";
+  page += "  <style type='text/css'>";
+  page += "    .btn-group-xs > .btn, .btn-xs {";
+  page += "        padding  : .25rem .4rem;";
+  page += "      font-size  : .875rem;";
+  page += "      line-height  : .5;";
+  page += "      border-radius : .2rem;";
+  page += "    }";
+  page += " </style>";
   page += "  <title>Arduino Dashboard</title>";
   page += "</head>";
   page += "<body>";
@@ -604,16 +642,43 @@ String GetPage(){
   page += "            <div class='card text-white bg-info mb-3'>";
   page += "              <div class='card-header'>Arduino info</div>";
   page += "              <div class='card-body'>";
-  page += "                <h3 class='card-title'>Connection: ON</h3>";
+  page += "                   <div class='row'>";
+  page += "                     <div class='col-md-4'>";
+  page += "                       <h4 class='card-title'>CPU:";
+  page += ESP.getCpuFreqMHz();
+  page += " Hz</h4>";
+  page += "                     </div>";
+  page += "                     <div class='col-md-2'></div>";
+  page += "                       <div class='col-md-4'>";
+  page += "                         <h4 class='card-title'>Vcc:";
+  page += ESP.getVcc();
+  page += " v</h4>";
+  page += "                       </div>";
+  page += "                    </div>";
+  page += "                 <div class='row'>";
+  page += "                   <div class='col-md-7'>";
+  page += "                     <div class='progress' style='height: 31px'>";
+  page += "                       <div class='progress-bar bg-warning' role='progressbar' style='width: ";
+  page += MemoryUsageInPercent();
+  page +=                         "%' aria-valuenow='";
+  page += MemoryUsageInPercent();
+  page +=                         "' aria-valuemin='0' aria-valuemax='100'> Memory usage";
+  page += MemoryUsageInPercent();
+  page += "                       </div>";
+  page += "                     </div>";
+  page += "                 </div>";
+  page += "                 <div class='col-md-4'>";
   page += "                   <form action='/' method='POST' style='margin:0px'>";
-  page += "                     <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
   page += "                     <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>";
   page += "                   </form>";
+  page += "                 </div>";
+  page += "               </div>";
   page += "              </div>";
   page += "        <div class='card-footer'>";
   page += "         <small>Work duration:";
   page +=             GetCurrentTime();
   page += "         </small>";
+  page += "         <button type='button' class='float-right btn btn-warning btn-xs' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
   page += "         </div>";
   page += "            </div>";
   page += "          </div>";
