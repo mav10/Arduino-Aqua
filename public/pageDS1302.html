@@ -61,11 +61,10 @@
                 <div class='card-body'>
 					<div class='row'>
 						<div class='col-md-4'>
-							<h3 class='card-title'>CPU:80 Hz</h3>
+							<h3 class='card-title'>CPU: 80 Hz</h3>
 						</div>
-						<div class='col-md-2'></div>
-						<div class='col-md-4'>
-							<h3 class='card-title'>Vcc: 65656 v</h3>
+						<div class='col-md-6'>
+							<div id='CpuContainer' style='min-width: 300px; height: 40px;'></div>
 						</div>
 
 					</div>
@@ -311,6 +310,44 @@
             'время:' + this.point.name.toLowerCase() + '<br/>' + this.point.y;
           }
         }
+      });
+    </script>
+	<script type='text/javascript'>
+      Highcharts.chart('CpuContainer', {
+        chart: {
+			type: 'areaspline',
+			backgroundColor:'rgba(255, 255, 255, 0.0)',
+			margin: [0, 0, 10, 0]
+		},
+		legend: {
+            enabled: false
+        },
+		credits: {
+			enabled: false
+	    },
+		exporting: {
+			enabled: false
+		},
+		title:{
+			text: ''
+		},
+		xAxis:{
+			min:0,
+			max: 24,
+			visible: false
+		},
+		yAxis:{
+			visible: false
+		},
+		series: [{
+			name: 'CPU usage per hour',
+			data: [60, 48, 48, 64, 51, 68, 47, 48, 79, 80, 81, 72, 63, 64, 65, 46, 77, 48, 79, 80, 71, 62, 63, 64],
+			borderWidth: 0,
+			marker: {
+				enabled: false
+			},
+			color: 'rgb(230, 245, 255)'
+		}]
       });
     </script>
     <script type='text/javascript'>

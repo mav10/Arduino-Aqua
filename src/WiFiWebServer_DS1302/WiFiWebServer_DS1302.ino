@@ -61,6 +61,7 @@ DS1302 rtc(kCePin, kIoPin, kSclkPin);
 // specify the port to listen on as an argument
 WiFiServer server(80);
 
+int CpuUsage[24];
 typedef struct {
   String startTime;
   String finishTime;
@@ -568,12 +569,29 @@ void ExecuteGD7(String currentTime){
   }
 }
 
+void AddCurrentCpuUsage(int hour){
+  if(hour > 0 && hour <= 23)
+    CpuUsage[hour] = ESP.getCpuFreqMHz();
+}
+
+String CpuArrayToString(){
+  string result = "";
+  for(int i=0; i < 24, i++){
+    result += CpuUsage[i];
+    if(i < 23)
+      result += ", ";
+  }
+}
+
 void ScheduleCleanUp(String currentTime){
   int separatorIndex = currentTime.indexOf(":");
   int minutes = currentTime.substring(separatorIndex + 1).toInt();
   if(minutes == 0)
     {
+      int hours = currentTime.substring(0, separatorIndex).toInt();
       ClearCache();
+      
+      AddCurrentCpuUsage(hours);
       LOG("CleanUp has just been executed", NORMAL);
     }
 }
@@ -642,19 +660,16 @@ String GetPage(){
   page += "            <div class='card text-white bg-info mb-3'>";
   page += "              <div class='card-header'>Arduino info</div>";
   page += "              <div class='card-body'>";
-  page += "                   <div class='row'>";
-  page += "                     <div class='col-md-4'>";
-  page += "                       <h4 class='card-title'>CPU:";
+  page += "                 <div class='row'>";
+  page += "                    <div class='col-md-4'>";
+  page += "                       <h4 class='card-title'>CPU: ";
   page += ESP.getCpuFreqMHz();
   page += " Hz</h4>";
-  page += "                     </div>";
-  page += "                     <div class='col-md-2'></div>";
-  page += "                       <div class='col-md-4'>";
-  page += "                         <h4 class='card-title'>Vcc:";
-  page += ESP.getVcc();
-  page += " v</h4>";
-  page += "                       </div>";
   page += "                    </div>";
+  page += "                    <div class='col-md-6'>";
+  page += "                      <div id='CpuContainer' style='min-width: 300px; height: 40px;'></div>";
+  page += "                    </div>";
+  page += "                 </div>";
   page += "                 <div class='row'>";
   page += "                   <div class='col-md-7'>";
   page += "                     <div class='progress' style='height: 31px'>";
@@ -904,6 +919,46 @@ String GetPage(){
   page += "      }";
   page += "    });";
   page += "  </script>";
+  page += "    <script type='text/javascript'>";
+  page += "      Highcharts.chart('CpuContainer', {";
+  page += "        chart: {";
+  page += "      type: 'areaspline',";
+  page += "      backgroundColor:'rgba(255, 255, 255, 0.0)',";
+  page += "      margin: [0, 0, 10, 0]";
+  page += "    },";
+  page += "    legend: {";
+  page += "            enabled: false";
+  page += "        },";
+  page += "    credits: {";
+  page += "      enabled: false";
+  page += "      },";
+  page += "    exporting: {";
+  page += "      enabled: false";
+  page += "    },";
+  page += "    title:{";
+  page += "      text: ''";
+  page += "    },";
+  page += "    xAxis:{";
+  page += "      min:0,";
+  page += "      max: 24,";
+  page += "      visible: false";
+  page += "    },";
+  page += "    yAxis:{";
+  page += "      visible: false";
+  page += "    },";
+  page += "    series: [{";
+  page += "      name: 'CPU usage per hour',";
+  page += "      data: [";
+  page += CpuArrayToString();
+  page += "      ],";
+  page += "      borderWidth: 0,";
+  page += "      marker: {";
+  page += "        enabled: false";
+  page += "      },";
+  page += "      color: 'rgb(230, 245, 255)'";
+  page += "    }]";
+  page += "      });";
+  page += "    </script>";
   page += "  <script type='text/javascript'>";
   page += "      $(document).ready(function () {";
   page += "          $('#GD8ex').slider({";
