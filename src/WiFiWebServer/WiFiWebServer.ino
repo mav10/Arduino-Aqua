@@ -372,6 +372,12 @@ String ParseTime(String requestBody, String patternStart, String patternEnd){
   return parsedTime;
 }
 
+int MemoryUsageInPercent(){
+  int totalSize = 32200;
+  int usedBytes = totalSize - ESP.getFreeHeap();
+  return (usedBytes*100/totalSize);
+}
+
 void SaveGD7TimeSchedule(String requestBody){
   String startTime = GetValueFromHtmlForm("timeStart", requestBody);
   startTime = startTime.substring(0, startTime.indexOf("&GD7timeEnd"));
@@ -510,15 +516,33 @@ void ExecuteGD7(String currentTime){
   }
 }
 
+void AddCurrentCpuUsage(int hour){
+  if(hour > 0 && hour <= 23)
+    CpuUsage[hour] = ESP.getCpuFreqMHz();
+}
+
+String CpuArrayToString(){
+  String result = "";
+  for(int i=0; i < 24; i++){
+    result += String(CpuUsage[i]);
+    if(i < 23)
+      result += ", ";
+  }
+  return result;
+}
+
 void ScheduleCleanUp(String currentTime){ 
   int separatorIndex = currentTime.indexOf(":");
   int minutes = currentTime.substring(separatorIndex + 1).toInt();
   if(minutes == 0)
     {
+      int hours = currentTime.substring(0, separatorIndex).toInt();
       ClearCache();
+      
+      AddCurrentCpuUsage(hours);
       LOG("CleanUp has just been executed", NORMAL);
     }
-} 
+}
 
 String GetPage(){
   String page = "";
@@ -539,6 +563,14 @@ String GetPage(){
   page += "  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/css/bootstrap-slider.min.css' />";
   page += "  <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/bootstrap-slider/10.0.2/css/bootstrap-slider.css' />";
   page += "  <link rel='stylesheet' href='https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css' integrity='sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm' crossorigin='anonymous'>";
+  page += "  <style type='text/css'>";
+  page += "    .btn-group-xs > .btn, .btn-xs {";
+  page += "        padding  : .25rem .4rem;";
+  page += "      font-size  : .875rem;";
+  page += "      line-height  : .5;";
+  page += "      border-radius : .2rem;";
+  page += "    }";
+  page += " </style>";
   page += "  <title>Arduino Dashboard</title>";
   page += "</head>";
   page += "<body>";
@@ -575,17 +607,41 @@ String GetPage(){
   page += "          <div class='col-md-4'>";
   page += "            <div class='card text-white bg-info mb-3'>";
   page += "              <div class='card-header'>Arduino info</div>";
-  page += "<div class='card-body'>";
-  page += "                  <h3 class='card-title'>Connection: ON</h3>";
-  page += "                    <form action='/' method='POST' style='margin:0px'>";
-  page += "                       <button type='button' class='btn btn-warning btn-sm' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
-  page += "                       <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>";
+  page += "               <div class='card-body'>";
+  page += "                 <div class='row'>";
+  page += "                    <div class='col-md-4'>";
+  page += "                       <h4 class='card-title'>CPU: ";
+  page += ESP.getCpuFreqMHz();
+  page += " Hz</h4>";
+  page += "                    </div>";
+  page += "                    <div class='col-md-6'>";
+  page += "                      <div id='CpuContainer' style='min-width: 300px; height: 40px;'></div>";
+  page += "                    </div>";
+  page += "                 </div>";
+  page += "                 <div class='row'>";
+  page += "                   <div class='col-md-7'>";
+  page += "                     <div class='progress' style='height: 31px'>";
+  page += "                       <div class='progress-bar bg-warning' role='progressbar' style='width: ";
+  page += MemoryUsageInPercent();
+  page +=                         "%' aria-valuenow='";
+  page += MemoryUsageInPercent();
+  page +=                         "' aria-valuemin='0' aria-valuemax='100'> Memory usage";
+  page += MemoryUsageInPercent();
+  page += "                       </div>";
+  page += "                     </div>";
+  page += "                 </div>";
+  page += "                 <div class='col-md-4'>";
+  page += "                   <form action='/' method='POST' style='margin:0px'>";
+  page += "                     <button type='submit' name='clearAll' class='btn btn-warning btn-sm'>Clear cash and logs </button>";
   page += "                   </form>";
+  page += "                 </div>";
+  page += "               </div>";
   page += "                </div>";
   page += "        <div class='card-footer'>";
   page += "         <small>Work duration:";
   page +=             GetCurrentTime();
   page += "         </small>";
+  page += "         <button type='button' class='float-right btn btn-warning btn-xs' data-toggle='modal' data-target='#SetupTime'>Setup time</button>";
   page += "         </div>";
   page += "            </div>";
   page += "          </div>";
@@ -824,6 +880,46 @@ String GetPage(){
   page += "      }";
   page += "    });";
   page += "  </script>";
+    page += "    <script type='text/javascript'>";
+  page += "      Highcharts.chart('CpuContainer', {";
+  page += "        chart: {";
+  page += "      type: 'areaspline',";
+  page += "      backgroundColor:'rgba(255, 255, 255, 0.0)',";
+  page += "      margin: [0, 0, 10, 0]";
+  page += "    },";
+  page += "    legend: {";
+  page += "            enabled: false";
+  page += "        },";
+  page += "    credits: {";
+  page += "      enabled: false";
+  page += "      },";
+  page += "    exporting: {";
+  page += "      enabled: false";
+  page += "    },";
+  page += "    title:{";
+  page += "      text: ''";
+  page += "    },";
+  page += "    xAxis:{";
+  page += "      min:0,";
+  page += "      max: 24,";
+  page += "      visible: false";
+  page += "    },";
+  page += "    yAxis:{";
+  page += "      visible: false";
+  page += "    },";
+  page += "    series: [{";
+  page += "      name: 'CPU usage per hour',";
+  page += "      data: [";
+  page += CpuArrayToString();
+  page += "      ],";
+  page += "      borderWidth: 0,";
+  page += "      marker: {";
+  page += "        enabled: false";
+  page += "      },";
+  page += "      color: 'rgb(230, 245, 255)'";
+  page += "    }]";
+  page += "      });";
+  page += "    </script>";
   page += "  <script type='text/javascript'>";
   page += "      $(document).ready(function () {";
   page += "          $('#GD8ex').slider({";

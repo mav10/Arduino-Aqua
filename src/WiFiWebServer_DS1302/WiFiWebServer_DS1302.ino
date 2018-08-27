@@ -575,12 +575,13 @@ void AddCurrentCpuUsage(int hour){
 }
 
 String CpuArrayToString(){
-  string result = "";
-  for(int i=0; i < 24, i++){
-    result += CpuUsage[i];
+  String result = "";
+  for(int i=0; i < 24; i++){
+    result += String(CpuUsage[i]);
     if(i < 23)
       result += ", ";
   }
+  return result;
 }
 
 void ScheduleCleanUp(String currentTime){
